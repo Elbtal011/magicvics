@@ -681,10 +681,23 @@ app.post('/api/admin/users', async (req, res) => {
   }
 });
 
+async function findProfileByAnyId(id) {
+  let profile = await prisma.profile.findUnique({ where: { id }, include: { employee: true } });
+  if (!profile) {
+    const employee = await prisma.employee.findUnique({ where: { id }, include: { profile: { include: { employee: true } } } });
+    if (employee?.profile) profile = employee.profile;
+  }
+  if (!profile) {
+    const employee = await prisma.employee.findFirst({ where: { profileId: id }, include: { profile: { include: { employee: true } } } });
+    if (employee?.profile) profile = employee.profile;
+  }
+  return profile;
+}
+
 app.patch('/api/admin/users/:id', async (req, res) => {
   const id = req.params.id;
   const body = req.body || {};
-  const existing = await prisma.profile.findUnique({ where: { id }, include: { employee: true } });
+  const existing = await findProfileByAnyId(id);
   if (!existing) return res.status(404).json({ error: 'User not found' });
 
   const metadata = body.user_metadata || {};
@@ -696,7 +709,7 @@ app.patch('/api/admin/users/:id', async (req, res) => {
   const updated = await prisma.$transaction(async (tx) => {
     const fullNameFromUpdate = `${firstName ?? existing.firstName ?? ''} ${lastName ?? existing.lastName ?? ''}`.trim();
     const profile = await tx.profile.update({
-      where: { id },
+      where: { id: existing.id },
       data: {
         email: body.email ?? undefined,
         firstName: firstName !== undefined ? firstName || null : undefined,
@@ -716,10 +729,10 @@ app.patch('/api/admin/users/:id', async (req, res) => {
     });
 
     if (role === 'user' && !profile.employee) {
-      await tx.employee.create({ data: { profileId: id, status: 'active', department: body.position || null, hiredAt: new Date() } });
+      await tx.employee.create({ data: { profileId: existing.id, status: 'active', department: body.position || null, hiredAt: new Date() } });
     }
 
-    return tx.profile.findUnique({ where: { id }, include: { employee: true } });
+    return tx.profile.findUnique({ where: { id: existing.id }, include: { employee: true } });
   });
 
   res.json({ user: serializeAdminUser(updated) });
@@ -727,9 +740,9 @@ app.patch('/api/admin/users/:id', async (req, res) => {
 
 app.delete('/api/admin/users/:id', async (req, res) => {
   const id = req.params.id;
-  const existing = await prisma.profile.findUnique({ where: { id } });
+  const existing = await findProfileByAnyId(id);
   if (!existing) return res.status(404).json({ error: 'User not found' });
-  await prisma.profile.delete({ where: { id } });
+  await prisma.profile.delete({ where: { id: existing.id } });
   res.json({ success: true, message: 'User deleted' });
 });
 
