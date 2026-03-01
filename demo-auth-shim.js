@@ -874,37 +874,51 @@
           const requestedId = idFilter.startsWith('eq.') ? decodeURIComponent(idFilter.slice(3)) : null;
           if (requestedId) {
             try {
+              let emp = null;
+
+              // First try direct employee lookup.
               const resp = await originalFetch(`/api/employees/${requestedId}`, init);
               if (resp.ok) {
-                const payload = await resp.json();
-                const emp = payload?.data || null;
-                if (emp) {
-                  const profileLike = {
-                    id: emp.profile_id || emp.id,
-                    first_name: emp.first_name || null,
-                    last_name: emp.last_name || null,
-                    email: emp.email || null,
-                    role: emp.role || 'user',
-                    phone: emp.phone || null,
-                    city: emp.city || null,
-                    nationality: emp.nationality || null,
-                    tax_number: emp.tax_number || null,
-                    social_security_number: emp.social_security_number || null,
-                    health_insurance: emp.health_insurance || null,
-                    iban: emp.iban || null,
-                    bic: emp.bic || null,
-                    recipient_name: emp.recipient_name || null,
-                    admin_notes: emp.admin_notes || null,
-                    kyc_status: emp.kyc_status || 'pending',
-                    created_at: emp.created_at || isoNow(),
-                    updated_at: emp.updated_at || isoNow()
-                  };
-                  const existingRows = store.get('profiles') || [];
-                  if (!existingRows.find((r) => r.id === profileLike.id)) {
-                    store.set('profiles', [...existingRows, profileLike]);
-                  }
-                  one = pickFields(profileLike, select);
+                const payload = await resp.json().catch(() => ({}));
+                emp = payload?.data || null;
+              }
+
+              // Fallback: list endpoint then match by id/profile_id.
+              if (!emp) {
+                const listResp = await originalFetch('/api/employees', init);
+                if (listResp.ok) {
+                  const listPayload = await listResp.json().catch(() => ({}));
+                  const rows = Array.isArray(listPayload?.data) ? listPayload.data : [];
+                  emp = rows.find((r) => r.id === requestedId || r.profile_id === requestedId) || null;
                 }
+              }
+
+              if (emp) {
+                const profileLike = {
+                  id: emp.profile_id || emp.id,
+                  first_name: emp.first_name || null,
+                  last_name: emp.last_name || null,
+                  email: emp.email || null,
+                  role: emp.role || 'user',
+                  phone: emp.phone || null,
+                  city: emp.city || null,
+                  nationality: emp.nationality || null,
+                  tax_number: emp.tax_number || null,
+                  social_security_number: emp.social_security_number || null,
+                  health_insurance: emp.health_insurance || null,
+                  iban: emp.iban || null,
+                  bic: emp.bic || null,
+                  recipient_name: emp.recipient_name || null,
+                  admin_notes: emp.admin_notes || null,
+                  kyc_status: emp.kyc_status || 'pending',
+                  created_at: emp.created_at || isoNow(),
+                  updated_at: emp.updated_at || isoNow()
+                };
+                const existingRows = store.get('profiles') || [];
+                if (!existingRows.find((r) => r.id === profileLike.id)) {
+                  store.set('profiles', [...existingRows, profileLike]);
+                }
+                one = pickFields(profileLike, select);
               }
             } catch (err) {
               // Ignore and fall through to standard 406 response.
