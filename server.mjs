@@ -1,4 +1,5 @@
 import http from 'http';
+import https from 'https';
 import fs from 'fs';
 import path from 'path';
 import url from 'url';
@@ -35,11 +36,14 @@ function sendFile(res, filePath) {
 
 function proxyApi(req, res) {
   const target = new URL(req.url || '/', apiTarget);
-  const upstreamReq = http.request(
+  const requestLib = target.protocol === 'https:' ? https : http;
+  const headers = { ...req.headers, host: target.host };
+
+  const upstreamReq = requestLib.request(
     target,
     {
       method: req.method,
-      headers: req.headers
+      headers
     },
     (upstreamRes) => {
       res.writeHead(upstreamRes.statusCode || 502, upstreamRes.headers);
