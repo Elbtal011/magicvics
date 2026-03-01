@@ -465,10 +465,12 @@ app.put('/api/settings/:key', async (req, res) => {
 app.get('/api/admin/starter-task-tracking', async (_req, res) => {
   const employees = await prisma.employee.findMany({ include: { profile: true }, orderBy: { createdAt: 'desc' } });
   const data = employees.map((e) => ({
-    id: e.id,
+    id: e.profileId,
     employee_id: e.id,
     profile_id: e.profileId,
-    worker_id: e.id,
+    // Frontend starter-task table uses worker_id for /admin/employees/:id navigation,
+    // and that details page expects profile id shape.
+    worker_id: e.profileId,
     worker_first_name: e.profile.firstName || e.profile.fullName.split(' ')[0] || 'Unknown',
     worker_last_name: e.profile.lastName || e.profile.fullName.split(' ').slice(1).join(' '),
     worker_email: e.profile.email,
