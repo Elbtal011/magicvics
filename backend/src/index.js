@@ -465,6 +465,9 @@ app.put('/api/settings/:key', async (req, res) => {
 app.get('/api/admin/starter-task-tracking', async (_req, res) => {
   const employees = await prisma.employee.findMany({ include: { profile: true }, orderBy: { createdAt: 'desc' } });
   const data = employees.map((e) => ({
+    id: e.id,
+    employee_id: e.id,
+    profile_id: e.profileId,
     worker_id: e.id,
     worker_first_name: e.profile.firstName || e.profile.fullName.split(' ')[0] || 'Unknown',
     worker_last_name: e.profile.lastName || e.profile.fullName.split(' ').slice(1).join(' '),
@@ -1554,6 +1557,13 @@ app.post('/api/chat/conversations', async (req, res) => {
     existing = state.conversations.find(
       (c) => !c.deleted_at && c.task_assignment_id === taskAssignmentId && (userId ? c.created_by === userId : true)
     );
+  } else {
+    // Compatibility: widget may repeatedly call createConversation without taskAssignmentId.
+    // Reuse latest open conversation for the same user + type instead of creating duplicates.
+    const candidates = state.conversations
+      .filter((c) => !c.deleted_at && c.conversation_type === conversationType && (userId ? c.created_by === userId : true))
+      .sort((a, b) => new Date(b.updated_at || b.created_at).getTime() - new Date(a.updated_at || a.created_at).getTime());
+    existing = candidates[0] || null;
   }
 
   if (existing) {
