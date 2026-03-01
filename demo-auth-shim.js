@@ -57,11 +57,68 @@
 
   // Keep enforcing because React rerenders can restore original text/icon.
   const enforceBrand = () => applyBrandPatch();
-  const run = () => {
+
+  // Top "?" help icon should always open /admin/support.
+  function patchSupportHelpIcon() {
+    const candidates = Array.from(document.querySelectorAll('button, a, [role="button"]'));
+    let patched = false;
+
+    for (const el of candidates) {
+      const txt = (el.textContent || '').trim();
+      const title = (el.getAttribute('title') || '').toLowerCase();
+      const aria = (el.getAttribute('aria-label') || '').toLowerCase();
+      const looksLikeHelp =
+        txt === '?' ||
+        /\b(help|hilfe|support)\b/.test(title) ||
+        /\b(help|hilfe|support)\b/.test(aria);
+
+      if (!looksLikeHelp) continue;
+
+      // Prefer patching top navigation/header controls only.
+      const inTopBar = !!el.closest('header, [class*="top"], [class*="navbar"], [class*="nav"]');
+      if (!inTopBar) continue;
+
+      const targetPath = '/admin/support';
+
+      if (el.tagName === 'A') {
+        const a = el;
+        if (a.getAttribute('href') !== targetPath) {
+          a.setAttribute('href', targetPath);
+          patched = true;
+        }
+      }
+
+      if (!el.dataset.mvSupportPatched) {
+        el.addEventListener(
+          'click',
+          (ev) => {
+            ev.preventDefault();
+            ev.stopPropagation();
+            if (location.pathname !== targetPath) {
+              history.pushState({}, '', targetPath);
+              window.dispatchEvent(new PopStateEvent('popstate'));
+            }
+          },
+          true
+        );
+        el.dataset.mvSupportPatched = '1';
+        patched = true;
+      }
+    }
+
+    return patched;
+  }
+
+  const enforceUiPatches = () => {
     enforceBrand();
-    setTimeout(enforceBrand, 100);
-    setTimeout(enforceBrand, 500);
-    setTimeout(enforceBrand, 1500);
+    patchSupportHelpIcon();
+  };
+
+  const run = () => {
+    enforceUiPatches();
+    setTimeout(enforceUiPatches, 100);
+    setTimeout(enforceUiPatches, 500);
+    setTimeout(enforceUiPatches, 1500);
   };
 
   if (document.readyState === 'loading') {
@@ -70,7 +127,7 @@
     run();
   }
 
-  const brandObserver = new MutationObserver(() => enforceBrand());
+  const brandObserver = new MutationObserver(() => enforceUiPatches());
   brandObserver.observe(document.documentElement, { childList: true, subtree: true });
 
   const now = Math.floor(Date.now() / 1000);
