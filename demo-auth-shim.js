@@ -830,7 +830,11 @@
     headers: { 'content-type': 'application/json', ...extraHeaders }
   });
 
-  const noContent = (status = 204, extraHeaders = {}) => new Response('', { status, headers: extraHeaders });
+  const noContent = (status = 204, extraHeaders = {}) => {
+    // 204/205/304 must not include a response body.
+    const nullBodyStatuses = new Set([204, 205, 304]);
+    return new Response(nullBodyStatuses.has(status) ? null : '', { status, headers: extraHeaders });
+  };
 
   const shouldForceError = (url, init) => {
     if (params.get('demoError') === '1') return true;
