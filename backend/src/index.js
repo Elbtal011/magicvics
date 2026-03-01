@@ -143,9 +143,14 @@ app.get('/api/employees', async (req, res) => {
   res.json({ success: true, count: employees.length, data: employees.map(serializeEmployee) });
 });
 
+async function findEmployeeByAnyId(id, include = undefined) {
+  let employee = await prisma.employee.findUnique({ where: { id }, include });
+  if (!employee) employee = await prisma.employee.findFirst({ where: { profileId: id }, include });
+  return employee;
+}
+
 app.get('/api/employees/:id', async (req, res) => {
-  const employee = await prisma.employee.findUnique({
-    where: { id: req.params.id },
+  const employee = await findEmployeeByAnyId(req.params.id, {
     include: {
       profile: true,
       phoneNumbers: true,
@@ -222,7 +227,7 @@ app.post('/api/employees', async (req, res) => {
 
 app.patch('/api/employees/:id', async (req, res) => {
   const body = req.body || {};
-  const existing = await prisma.employee.findUnique({ where: { id: req.params.id }, include: { profile: true } });
+  const existing = await findEmployeeByAnyId(req.params.id, { profile: true });
   if (!existing) return res.status(404).json({ success: false, message: 'Employee not found' });
 
   const { first, last, fullName } = profileNameFromInput({
@@ -256,7 +261,7 @@ app.patch('/api/employees/:id', async (req, res) => {
     });
 
     return tx.employee.update({
-      where: { id: req.params.id },
+      where: { id: existing.id },
       data: {
         status: body.status ?? undefined,
         department: body.department !== undefined ? body.department || null : undefined,
@@ -278,9 +283,9 @@ app.patch('/api/employees/:id', async (req, res) => {
 });
 
 app.delete('/api/employees/:id', async (req, res) => {
-  const existing = await prisma.employee.findUnique({ where: { id: req.params.id } });
+  const existing = await findEmployeeByAnyId(req.params.id);
   if (!existing) return res.status(404).json({ success: false, message: 'Employee not found' });
-  await prisma.employee.delete({ where: { id: req.params.id } });
+  await prisma.employee.delete({ where: { id: existing.id } });
   res.json({ success: true, message: 'Employee deleted' });
 });
 
@@ -365,8 +370,10 @@ app.put('/api/worker-tags/notes/:workerId', async (req, res) => {
 });
 
 app.get('/api/employees/:id/tags', async (req, res) => {
+  const employee = await findEmployeeByAnyId(req.params.id);
+  if (!employee) return res.status(404).json({ success: false, error: 'Employee not found' });
   const links = await prisma.workerTagAssignment.findMany({
-    where: { workerId: req.params.id },
+    where: { workerId: employee.id },
     include: { tag: true },
     orderBy: { createdAt: 'desc' }
   });
@@ -374,32 +381,40 @@ app.get('/api/employees/:id/tags', async (req, res) => {
 });
 
 app.post('/api/employees/:id/tags/:tagId', async (req, res) => {
+  const employee = await findEmployeeByAnyId(req.params.id);
+  if (!employee) return res.status(404).json({ success: false, error: 'Employee not found' });
   const created = await prisma.workerTagAssignment.upsert({
-    where: { workerId_tagId: { workerId: req.params.id, tagId: req.params.tagId } },
+    where: { workerId_tagId: { workerId: employee.id, tagId: req.params.tagId } },
     update: {},
-    create: { workerId: req.params.id, tagId: req.params.tagId },
+    create: { workerId: employee.id, tagId: req.params.tagId },
     include: { tag: true }
   });
   res.status(201).json({ success: true, data: created.tag });
 });
 
 app.delete('/api/employees/:id/tags/:tagId', async (req, res) => {
-  await prisma.workerTagAssignment.deleteMany({ where: { workerId: req.params.id, tagId: req.params.tagId } });
+  const employee = await findEmployeeByAnyId(req.params.id);
+  if (!employee) return res.status(404).json({ success: false, error: 'Employee not found' });
+  await prisma.workerTagAssignment.deleteMany({ where: { workerId: employee.id, tagId: req.params.tagId } });
   res.json({ success: true, message: 'tag removed' });
 });
 
 app.get('/api/employees/:id/balances', async (req, res) => {
-  const balances = await prisma.workerBalance.findMany({ where: { workerId: req.params.id }, orderBy: { createdAt: 'desc' } });
+  const employee = await findEmployeeByAnyId(req.params.id);
+  if (!employee) return res.status(404).json({ success: false, error: 'Employee not found' });
+  const balances = await prisma.workerBalance.findMany({ where: { workerId: employee.id }, orderBy: { createdAt: 'desc' } });
   const totalCents = balances.reduce((s, b) => s + b.amountCents, 0);
   res.json({ success: true, total_cents: totalCents, total_eur: Number((totalCents / 100).toFixed(2)), data: balances });
 });
 
 app.post('/api/employees/:id/balances', async (req, res) => {
+  const employee = await findEmployeeByAnyId(req.params.id);
+  if (!employee) return res.status(404).json({ success: false, error: 'Employee not found' });
   const body = req.body || {};
   const amountCents = body.amount_cents !== undefined ? num(body.amount_cents, 0) : Math.round(num(body.amount, 0) * 100);
   const record = await prisma.workerBalance.create({
     data: {
-      workerId: req.params.id,
+      workerId: employee.id,
       amountCents,
       currency: body.currency || 'EUR',
       description: body.description || null,
@@ -411,16 +426,20 @@ app.post('/api/employees/:id/balances', async (req, res) => {
 });
 
 app.get('/api/employees/:id/time-entries', async (req, res) => {
-  const entries = await prisma.timeEntry.findMany({ where: { employeeId: req.params.id }, orderBy: { createdAt: 'desc' } });
+  const employee = await findEmployeeByAnyId(req.params.id);
+  if (!employee) return res.status(404).json({ success: false, error: 'Employee not found' });
+  const entries = await prisma.timeEntry.findMany({ where: { employeeId: employee.id }, orderBy: { createdAt: 'desc' } });
   const totalHours = entries.reduce((s, e) => s + Number(e.hours || 0), 0);
   res.json({ success: true, total_hours: Number(totalHours.toFixed(2)), data: entries });
 });
 
 app.post('/api/employees/:id/time-entries', async (req, res) => {
+  const employee = await findEmployeeByAnyId(req.params.id);
+  if (!employee) return res.status(404).json({ success: false, error: 'Employee not found' });
   const body = req.body || {};
   const entry = await prisma.timeEntry.create({
     data: {
-      employeeId: req.params.id,
+      employeeId: employee.id,
       hours: num(body.hours, 0),
       status: body.status || 'approved',
       description: body.description || null,
