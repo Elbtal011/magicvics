@@ -110,59 +110,72 @@ app.get('/api/employees/summary', async (_req, res) => {
 });
 
 app.get('/api/employees', async (req, res) => {
-  const q = (req.query.q || '').toString().trim();
-  const status = (req.query.status || '').toString().trim();
-  const role = (req.query.role || '').toString().trim();
+  try {
+    const q = (req.query.q || '').toString().trim();
+    const status = (req.query.status || '').toString().trim();
+    const role = (req.query.role || '').toString().trim();
 
-  const employees = await prisma.employee.findMany({
-    include: {
-      profile: true,
-      workerTagLinks: { include: { tag: true } },
-      balances: true,
-      phoneNumbers: true
-    },
-    where: {
-      ...(status ? { status } : {}),
-      profile: {
-        ...(role ? { role } : {}),
-        ...(q
-          ? {
-              OR: [
-                { email: { contains: q, mode: 'insensitive' } },
-                { fullName: { contains: q, mode: 'insensitive' } },
-                { firstName: { contains: q, mode: 'insensitive' } },
-                { lastName: { contains: q, mode: 'insensitive' } }
-              ]
-            }
-          : {})
-      }
-    },
-    orderBy: { createdAt: 'desc' }
-  });
+    const employees = await prisma.employee.findMany({
+      include: {
+        profile: true,
+        workerTagLinks: { include: { tag: true } },
+        balances: true,
+        phoneNumbers: true
+      },
+      where: {
+        ...(status ? { status } : {}),
+        profile: {
+          ...(role ? { role } : {}),
+          ...(q
+            ? {
+                OR: [
+                  { email: { contains: q, mode: 'insensitive' } },
+                  { fullName: { contains: q, mode: 'insensitive' } },
+                  { firstName: { contains: q, mode: 'insensitive' } },
+                  { lastName: { contains: q, mode: 'insensitive' } }
+                ]
+              }
+            : {})
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
 
-  res.json({ success: true, count: employees.length, data: employees.map(serializeEmployee) });
+    res.json({ success: true, count: employees.length, data: employees.map(serializeEmployee) });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to fetch employees', error: String(error) });
+  }
 });
 
 async function findEmployeeByAnyId(id, include = undefined) {
-  let employee = await prisma.employee.findUnique({ where: { id }, include });
-  if (!employee) employee = await prisma.employee.findFirst({ where: { profileId: id }, include });
-  return employee;
+  try {
+    let employee = await prisma.employee.findUnique({ where: { id }, include });
+    if (!employee) employee = await prisma.employee.findFirst({ where: { profileId: id }, include });
+    return employee;
+  } catch (_err) {
+    // Keep callers resilient; return null instead of crashing request handlers.
+    return null;
+  }
 }
 
 app.get('/api/employees/:id', async (req, res) => {
-  const employee = await findEmployeeByAnyId(req.params.id, {
-    include: {
-      profile: true,
-      phoneNumbers: true,
-      workerTagLinks: { include: { tag: true } },
-      balances: { orderBy: { createdAt: 'desc' } },
-      timeEntries: { orderBy: { createdAt: 'desc' } },
-      taskAssignments: { orderBy: { createdAt: 'desc' } }
-    }
-  });
+  try {
+    const employee = await findEmployeeByAnyId(req.params.id, {
+      include: {
+        profile: true,
+        phoneNumbers: true,
+        workerTagLinks: { include: { tag: true } },
+        balances: { orderBy: { createdAt: 'desc' } },
+        timeEntries: { orderBy: { createdAt: 'desc' } },
+        taskAssignments: { orderBy: { createdAt: 'desc' } }
+      }
+    });
 
-  if (!employee) return res.status(404).json({ success: false, message: 'Employee not found' });
-  res.json({ success: true, data: serializeEmployee(employee) });
+    if (!employee) return res.status(404).json({ success: false, message: 'Employee not found' });
+    res.json({ success: true, data: serializeEmployee(employee) });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to fetch employee', error: String(error) });
+  }
 });
 
 app.post('/api/employees', async (req, res) => {
