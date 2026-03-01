@@ -1662,7 +1662,15 @@ app.post(['/api/chat', '/api/chat/messages', '/api/chat/conversations/:id/messag
   next.conversations[convIdx] = { ...next.conversations[convIdx], updated_at: aiMsg.created_at };
   await saveChatState(next);
 
-  res.status(201).json({ success: true, conversation_id: conversationId, message: userMsg, reply: aiMsg });
+  res.status(201).json({
+    success: true,
+    conversation_id: conversationId,
+    // compatibility shapes used across different frontend bundles
+    message: userMsg,
+    reply: aiMsg,
+    userMessage: userMsg,
+    aiMessage: aiMsg
+  });
 });
 
 app.get('/api/postident/status/:id', async (req, res) => {
