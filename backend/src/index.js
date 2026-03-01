@@ -1522,6 +1522,44 @@ app.delete('/api/admin/chat/conversations/:id', async (req, res) => {
 });
 
 // User chat endpoints for demo compatibility
+app.post('/api/chat/conversations', async (req, res) => {
+  const state = await loadChatState();
+
+  const title = (req.body?.title || 'Projektleitung Chat').toString().trim();
+  const conversationType = (req.body?.conversationType || req.body?.conversation_type || 'general').toString();
+  const taskAssignmentId = (req.body?.taskAssignmentId || req.body?.task_assignment_id || '').toString().trim() || null;
+  const userId = (req.body?.user_id || req.body?.userId || '').toString().trim() || null;
+
+  let existing = null;
+  if (taskAssignmentId) {
+    existing = state.conversations.find(
+      (c) => !c.deleted_at && c.task_assignment_id === taskAssignmentId && (userId ? c.created_by === userId : true)
+    );
+  }
+
+  if (existing) {
+    return res.json({ success: true, conversation: existing, isExisting: true });
+  }
+
+  const now = nowIso();
+  const created = {
+    id: makeId('conv'),
+    created_by: userId,
+    conversation_type: conversationType,
+    task_assignment_id: taskAssignmentId,
+    title,
+    archived_at: null,
+    deleted_at: null,
+    created_at: now,
+    updated_at: now
+  };
+
+  state.conversations.unshift(created);
+  await saveChatState(state);
+
+  return res.json({ success: true, conversation: created, isExisting: false });
+});
+
 app.get('/api/chat/conversations', async (req, res) => {
   const state = await loadChatState();
   const userId = (req.query.user_id || req.query.userId || '').toString().trim();
@@ -1541,7 +1579,7 @@ app.get('/api/chat/conversations/:id/messages', async (req, res) => {
   res.json({ success: true, messages: data, pagination });
 });
 
-app.post(['/api/chat', '/api/chat/conversations/:id/messages'], async (req, res) => {
+app.post(['/api/chat', '/api/chat/messages', '/api/chat/conversations/:id/messages'], async (req, res) => {
   const content = (req.body?.content || req.body?.message || '').toString().trim();
   if (!content) return res.status(400).json({ success: false, error: 'content required' });
 
