@@ -1,0 +1,156 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Profile {
+  id                   String    @id @default(cuid())
+  email                String    @unique
+  fullName             String
+  firstName            String?   @map("first_name")
+  lastName             String?   @map("last_name")
+  role                 String
+  phone                String?
+  dateOfBirth          DateTime? @map("date_of_birth")
+  street               String?
+  postalCode           String?   @map("postal_code")
+  city                 String?
+  nationality          String?
+  taxNumber            String?   @map("tax_number")
+  socialSecurityNumber String?   @map("social_security_number")
+  healthInsurance      String?   @map("health_insurance")
+  iban                 String?
+  bic                  String?
+  recipientName        String?   @map("recipient_name")
+  kycStatus            String?   @default("pending") @map("kyc_status")
+  adminNotes           String?   @map("admin_notes")
+  bannedUntil          DateTime? @map("banned_until")
+  isActive             Boolean   @default(true)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  employee Employee?
+
+  @@index([role])
+}
+
+model Employee {
+  id          String   @id @default(cuid())
+  profileId   String   @unique
+  status      String   @default("active")
+  department  String?
+  salaryCents Int      @default(0)
+  hiredAt     DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  profile            Profile               @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  phoneNumbers       PhoneNumber[]
+  workerTagLinks     WorkerTagAssignment[]
+  taskAssignments    TaskAssignment[]
+  balances           WorkerBalance[]
+  timeEntries        TimeEntry[]
+
+  @@index([status])
+}
+
+model WorkerTag {
+  id          String                @id @default(cuid())
+  name        String                @unique
+  color       String?               @default("#3b82f6")
+  description String?
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  assignments WorkerTagAssignment[]
+
+  @@map("worker_tags")
+}
+
+model WorkerTagAssignment {
+  id         String   @id @default(cuid())
+  workerId   String   @map("worker_id")
+  tagId      String   @map("tag_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  worker Employee @relation(fields: [workerId], references: [id], onDelete: Cascade)
+  tag    WorkerTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([workerId, tagId])
+  @@index([workerId])
+  @@index([tagId])
+  @@map("worker_tag_assignments")
+}
+
+model TaskAssignment {
+  id          String   @id @default(cuid())
+  assigneeId  String   @map("assignee_id")
+  title       String
+  status      String   @default("pending")
+  dueDate     DateTime? @map("due_date")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  assignee Employee @relation(fields: [assigneeId], references: [id], onDelete: Cascade)
+
+  @@index([assigneeId])
+  @@map("task_assignments")
+}
+
+model WorkerBalance {
+  id             String   @id @default(cuid())
+  workerId       String   @map("worker_id")
+  amountCents    Int      @default(0) @map("amount_cents")
+  currency       String   @default("EUR")
+  description    String?
+  source         String   @default("manual")
+  createdBy      String?  @map("created_by")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  worker Employee @relation(fields: [workerId], references: [id], onDelete: Cascade)
+
+  @@index([workerId])
+  @@map("worker_balances")
+}
+
+model TimeEntry {
+  id          String   @id @default(cuid())
+  employeeId  String   @map("employee_id")
+  hours       Decimal  @default(0) @db.Decimal(6, 2)
+  status      String   @default("approved")
+  description String?
+  entryDate   DateTime @default(now()) @map("entry_date")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@map("time_entries")
+}
+
+model Setting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+}
+
+model PhoneNumber {
+  id           String   @id @default(cuid())
+  employeeId   String?
+  phoneNumber  String   @unique
+  provider     String
+  service      String
+  country      String   @default("DE")
+  monthlyPrice Decimal  @db.Decimal(10, 2)
+  rentedAt     DateTime @default(now())
+  status       String   @default("active")
+  notes        String?
+  createdAt    DateTime @default(now())
+
+  employee Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+}
