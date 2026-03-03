@@ -1936,8 +1936,26 @@ app.delete('/api/admin/job-listings/:id', async (req, res) => {
 
 app.get('/api/admin/job-applications', async (_req, res) => {
   try {
-    const rows = await getJobApplications();
-    const sorted = rows.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    const [rows, jobs] = await Promise.all([getJobApplications(), getJobListings()]);
+    const bySlug = new Map(jobs.map((j) => [String(j.slug || ''), j]));
+
+    const enriched = rows.map((r) => {
+      const appType = String(r.application_type || '').trim();
+      const isGeneric = !appType || /^initiativbewerbung$/i.test(appType);
+      if (!isGeneric) return r;
+
+      const job = bySlug.get(String(r.job_slug || '').trim());
+      if (!job?.title) return r;
+
+      return {
+        ...r,
+        job_title: r.job_title || job.title,
+        position_applied: r.position_applied || job.title,
+        application_type: job.title,
+      };
+    });
+
+    const sorted = enriched.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     res.json({ success: true, count: sorted.length, data: sorted });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to fetch job applications', error: String(error) });
