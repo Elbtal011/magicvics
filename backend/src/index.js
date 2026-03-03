@@ -33,6 +33,7 @@ const num = (v, fallback = 0) => {
 
 const OPENAI_API_KEY = String(process.env.OPENAI_API_KEY || '').trim();
 const OPENAI_MODEL = String(process.env.OPENAI_MODEL || 'gpt-4o-mini').trim();
+const CHAT_BRAND_NAME = String(process.env.CHAT_BRAND_NAME || 'Headline Agentur').trim();
 
 const defaultChatReply = (content) => `Danke für deine Nachricht: "${String(content || '').slice(0, 120)}". Ein Admin kann jederzeit eingreifen.`;
 
@@ -96,7 +97,7 @@ async function generateOpenAIReply({ content, history = [], snippets = [] }) {
     {
       role: 'system',
       content:
-        'Du bist der Karriere- und Support-Assistent von MagicVics/Headline. Antworte kurz, hilfreich und auf Deutsch. Wenn Informationen fehlen, stelle eine kurze Rückfrage. Erfinde keine Fakten.' +
+        `Du bist der Karriere- und Support-Assistent von ${CHAT_BRAND_NAME}. Antworte kurz, hilfreich und auf Deutsch. Wenn Informationen fehlen, stelle eine kurze Rückfrage. Erfinde keine Fakten.` +
         kbBlock
     },
     ...history,
