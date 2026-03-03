@@ -153,19 +153,6 @@
         }
       });
 
-      // Add explicit row in personal information section.
-      const personalTitle = Array.from(document.querySelectorAll('h2,h3,h4')).find((el) =>
-        /persönliche informationen/i.test((el.textContent || '').trim())
-      );
-      const personalSection = personalTitle ? personalTitle.closest('div') : null;
-      if (personalSection && !personalSection.querySelector('[data-mv-applied-job-row="1"]')) {
-        const rowEl = document.createElement('div');
-        rowEl.setAttribute('data-mv-applied-job-row', '1');
-        rowEl.style.marginTop = '8px';
-        rowEl.innerHTML = `<div style="display:flex;align-items:center;gap:8px;color:#64748b;font-size:12px;">💼 <span>Beworbene Stelle</span></div><div style="font-weight:600;margin-top:2px;">${String(appliedTitle).replace(/</g, '&lt;')}</div>`;
-        personalSection.appendChild(rowEl);
-      }
-
       return true;
     } catch {
       return false;
