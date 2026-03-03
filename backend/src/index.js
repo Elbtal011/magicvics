@@ -9,7 +9,20 @@ const app = express();
 const prisma = new PrismaClient();
 const port = Number(process.env.PORT || 4000);
 
-app.use(cors({ origin: process.env.FRONTEND_ORIGIN || '*' }));
+const allowedOrigins = String(process.env.FRONTEND_ORIGIN || '*')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+app.use(
+  cors({
+    origin: (origin, cb) => {
+      if (!origin) return cb(null, true);
+      if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) return cb(null, true);
+      return cb(new Error(`CORS blocked for origin: ${origin}`));
+    }
+  })
+);
 app.use(express.json());
 
 const nowIso = () => new Date().toISOString();
