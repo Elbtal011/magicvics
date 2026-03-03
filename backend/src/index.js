@@ -1711,6 +1711,103 @@ app.post(['/api/chat', '/api/chat/messages', '/api/chat/conversations/:id/messag
   });
 });
 
+const JOB_LISTINGS_KEY = 'job_listings_v1';
+
+const normalizeJobListing = (row = {}) => {
+  const title = String(row.title || '').trim();
+  const slugBase = String(row.slug || title)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80) || `job-${Math.random().toString(36).slice(2, 8)}`;
+
+  return {
+    id: row.id || `job_${Math.random().toString(36).slice(2, 10)}`,
+    slug: slugBase,
+    title,
+    summary: String(row.summary || row.description || '').trim(),
+    tasks: Array.isArray(row.tasks) ? row.tasks : [],
+    profile: Array.isArray(row.profile) ? row.profile : [],
+    offer: Array.isArray(row.offer) ? row.offer : [],
+    facts: row.facts && typeof row.facts === 'object' ? row.facts : {},
+    status: String(row.status || 'active').toLowerCase(),
+    created_at: row.created_at || nowIso(),
+    updated_at: nowIso()
+  };
+};
+
+async function getJobListings() {
+  const existing = await prisma.setting.findUnique({ where: { key: JOB_LISTINGS_KEY } });
+  const value = existing?.value;
+  const rows = Array.isArray(value?.jobs) ? value.jobs : Array.isArray(value) ? value : [];
+  return rows.map(normalizeJobListing);
+}
+
+async function saveJobListings(jobs) {
+  const normalized = jobs.map(normalizeJobListing);
+  await putSettingJson(JOB_LISTINGS_KEY, { jobs: normalized, updated_at: nowIso() });
+  return normalized;
+}
+
+app.get('/api/public/job-listings', async (_req, res) => {
+  try {
+    const jobs = await getJobListings();
+    const active = jobs.filter((j) => j.status === 'active');
+    res.json({ success: true, count: active.length, data: active });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to fetch public job listings', error: String(error) });
+  }
+});
+
+app.get('/api/admin/job-listings', async (_req, res) => {
+  try {
+    const jobs = await getJobListings();
+    res.json({ success: true, count: jobs.length, data: jobs });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to fetch admin job listings', error: String(error) });
+  }
+});
+
+app.post('/api/admin/job-listings', async (req, res) => {
+  try {
+    const payload = Array.isArray(req.body) ? req.body : [req.body || {}];
+    const current = await getJobListings();
+    const next = [...current, ...payload.map(normalizeJobListing)];
+    const saved = await saveJobListings(next);
+    res.status(201).json({ success: true, data: saved.slice(-payload.length) });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to create job listing', error: String(error) });
+  }
+});
+
+app.patch('/api/admin/job-listings/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    const patch = req.body || {};
+    const current = await getJobListings();
+    const idx = current.findIndex((j) => j.id === id);
+    if (idx < 0) return res.status(404).json({ success: false, message: 'Job listing not found' });
+    const merged = normalizeJobListing({ ...current[idx], ...patch, id: current[idx].id, created_at: current[idx].created_at });
+    current[idx] = merged;
+    await saveJobListings(current);
+    res.json({ success: true, data: merged });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to update job listing', error: String(error) });
+  }
+});
+
+app.delete('/api/admin/job-listings/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    const current = await getJobListings();
+    const next = current.filter((j) => j.id !== id);
+    await saveJobListings(next);
+    res.status(204).end();
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to delete job listing', error: String(error) });
+  }
+});
+
 app.get('/api/postident/status/:id', async (req, res) => {
   const requestId = req.params.id;
   const key = `postident:status:${requestId}`;

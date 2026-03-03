@@ -851,6 +851,75 @@
   };
 
   const handleTable = async (table, method, urlObj, init) => {
+    // Bridge selected legacy Supabase table calls into real backend endpoints.
+    if (useRealApi && table === 'job_listings') {
+      const toPublic = '/api/public/job-listings';
+      const toAdmin = '/api/admin/job-listings';
+
+      if (method === 'GET' || method === 'HEAD') {
+        const resp = await originalFetch(toAdmin, { method: 'GET', headers: init?.headers });
+        if (!resp.ok) return json({ message: 'Failed to fetch job listings' }, 502);
+        const payload = await resp.json().catch(() => ({}));
+        const rows = Array.isArray(payload?.data) ? payload.data : [];
+        const filteredRows = applyQuery(rows, urlObj.searchParams);
+
+        if (method === 'HEAD') {
+          const totalCount = filteredRows.length;
+          return new Response('', {
+            status: 200,
+            headers: { 'content-range': `0-${Math.max(0, totalCount - 1)}/${totalCount}` }
+          });
+        }
+
+        const accept = (asHeaders(init?.headers).get('accept') || '').toLowerCase();
+        const wantsSingle = accept.includes('vnd.pgrst.object+json');
+        if (wantsSingle) return filteredRows[0] ? json(filteredRows[0]) : json({ message: 'No rows' }, 406);
+        const totalCount = filteredRows.length;
+        return json(filteredRows, 200, { 'content-range': `0-${Math.max(0, totalCount - 1)}/${totalCount}` });
+      }
+
+      if (method === 'POST') {
+        const body = normalizeBody(init?.body);
+        const entries = Array.isArray(body) ? body : [body];
+        const resp = await originalFetch(toAdmin, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(entries)
+        });
+        if (!resp.ok) return json({ message: 'Failed to create job listing' }, 502);
+        const payload = await resp.json().catch(() => ({}));
+        const created = Array.isArray(payload?.data) ? payload.data : [];
+        return getPrefer(init?.headers).includes('return=representation') ? json(created) : noContent(201);
+      }
+
+      if (method === 'PATCH' || method === 'PUT') {
+        const body = normalizeBody(init?.body);
+        const idFilter = (urlObj.searchParams.get('id') || '').toString();
+        const id = idFilter.startsWith('eq.') ? decodeURIComponent(idFilter.slice(3)) : null;
+        if (!id) return json({ message: 'Missing id filter for update' }, 400);
+        const resp = await originalFetch(`${toAdmin}/${encodeURIComponent(id)}`, {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        if (!resp.ok) return json({ message: 'Failed to update job listing' }, 502);
+        const payload = await resp.json().catch(() => ({}));
+        const updated = payload?.data ? [payload.data] : [];
+        return getPrefer(init?.headers).includes('return=representation') ? json(updated) : noContent();
+      }
+
+      if (method === 'DELETE') {
+        const idFilter = (urlObj.searchParams.get('id') || '').toString();
+        const id = idFilter.startsWith('eq.') ? decodeURIComponent(idFilter.slice(3)) : null;
+        if (!id) return json({ message: 'Missing id filter for delete' }, 400);
+        const resp = await originalFetch(`${toAdmin}/${encodeURIComponent(id)}`, { method: 'DELETE' });
+        if (!resp.ok) return json({ message: 'Failed to delete job listing' }, 502);
+        return noContent();
+      }
+
+      return json({ message: `Unsupported method ${method} for bridged table ${table}` }, 405);
+    }
+
     const rows = store.get(table) || [];
     const select = urlObj.searchParams.get('select');
     const filtered = applyQuery(rows, urlObj.searchParams);
