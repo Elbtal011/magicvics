@@ -84,6 +84,6 @@ http.createServer((req, res) => {
 
   res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
   res.end('Not found');
-}).listen(port, () => {
-  console.log(`magicvics mirror server running at http://localhost:${port}`);
+}).listen(port, '0.0.0.0', () => {
+  console.log(`magicvics mirror server running on 0.0.0.0:${port}`);
 });
