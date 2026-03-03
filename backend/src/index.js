@@ -1740,16 +1740,20 @@ const normalizeJobListing = (row = {}) => {
     .replace(/^-+|-+$/g, '')
     .slice(0, 80) || `job-${Math.random().toString(36).slice(2, 8)}`;
 
-  const brief = String(row.brief_description || row.briefDescription || row.summary || '').trim();
-  const description = String(row.description || row.summary || row.brief_description || '').trim();
+  const brief = String(row.brief_description || row.briefDescription || row.short_description || row.summary || '').trim();
+  const description = String(row.description || row.summary || row.short_description || row.brief_description || '').trim();
 
   const requirements = toList(row.requirements || row.profile);
-  const tasks = toList(row.tasks);
+  const tasks = toList(row.tasks || row.responsibilities);
   const benefits = toList(row.benefits || row.offer);
 
+  const employmentTypeValue = row.type_of_employment || row.employment_type || row.employmentType || '';
+  const workModelValue = row.working_model || row.workingModel || row.work_model || row.workModel || '';
+  const salaryDisplayValue = row.ad_text || row.adText || row.salary_display || row.salaryDisplay || row.salary_text || '';
+
   const facts = row.facts && typeof row.facts === 'object' ? { ...row.facts } : {};
-  if (!facts.employment) facts.employment = row.type_of_employment || row.employment_type || row.employmentType || null;
-  if (!facts.salary) facts.salary = row.ad_text || row.salary_text || null;
+  if (!facts.employment) facts.employment = employmentTypeValue || null;
+  if (!facts.salary) facts.salary = salaryDisplayValue || null;
   if (!facts.location) facts.location = row.location || null;
 
   return {
@@ -1767,12 +1771,16 @@ const normalizeJobListing = (row = {}) => {
     // admin-form compatible aliases
     brief_description: brief,
     briefDescription: brief,
+    short_description: row.short_description || brief,
+    shortDescription: row.shortDescription || row.short_description || brief,
     description,
-    type_of_employment: row.type_of_employment || row.employment_type || row.employmentType || '',
-    employment_type: row.employment_type || row.type_of_employment || row.employmentType || '',
-    employmentType: row.employmentType || row.employment_type || row.type_of_employment || '',
-    working_model: row.working_model || row.workingModel || '',
-    workingModel: row.workingModel || row.working_model || '',
+    type_of_employment: employmentTypeValue,
+    employment_type: employmentTypeValue,
+    employmentType: employmentTypeValue,
+    working_model: workModelValue,
+    workingModel: workModelValue,
+    work_model: workModelValue,
+    workModel: workModelValue,
     location: row.location || '',
     min_salary: row.min_salary ?? row.minSalary ?? 0,
     minSalary: row.minSalary ?? row.min_salary ?? 0,
@@ -1780,9 +1788,12 @@ const normalizeJobListing = (row = {}) => {
     maxSalary: row.maxSalary ?? row.max_salary ?? 0,
     salary_type: row.salary_type || row.salaryType || 'per month',
     salaryType: row.salaryType || row.salary_type || 'per month',
-    ad_text: row.ad_text || row.salary_text || '',
-    adText: row.adText || row.ad_text || row.salary_text || '',
+    ad_text: salaryDisplayValue,
+    adText: salaryDisplayValue,
+    salary_display: row.salary_display || salaryDisplayValue,
+    salaryDisplay: row.salaryDisplay || row.salary_display || salaryDisplayValue,
     requirements,
+    responsibilities: tasks,
     benefits,
     internal_tags: toList(row.internal_tags || row.tags),
     internalTags: toList(row.internalTags || row.internal_tags || row.tags),
