@@ -1725,6 +1725,7 @@ app.post(['/api/chat', '/api/chat/messages', '/api/chat/conversations/:id/messag
 });
 
 const JOB_LISTINGS_KEY = 'job_listings_v1';
+const JOB_APPLICATIONS_KEY = 'job_applications_v1';
 
 const toList = (v) => {
   if (Array.isArray(v)) return v.map((x) => String(x || '').trim()).filter(Boolean);
@@ -1817,6 +1818,45 @@ async function saveJobListings(jobs) {
   return normalized;
 }
 
+const normalizeJobApplication = (row = {}) => {
+  const firstName = String(row.first_name || row.firstName || '').trim();
+  const lastName = String(row.last_name || row.lastName || '').trim();
+  const fullName = String(row.full_name || row.fullName || [firstName, lastName].filter(Boolean).join(' ')).trim();
+  const email = String(row.email || '').trim().toLowerCase();
+
+  return {
+    id: row.id || `ja_${Math.random().toString(36).slice(2, 10)}`,
+    first_name: firstName || fullName || 'Bewerber',
+    last_name: lastName || '-',
+    full_name: fullName || `${firstName} ${lastName}`.trim(),
+    email,
+    phone: String(row.phone || '').trim(),
+    birth_date: String(row.birth_date || row.birthDate || '').trim(),
+    address: String(row.address || '').trim(),
+    zip: String(row.zip || '').trim(),
+    city: String(row.city || '').trim(),
+    country: String(row.country || '').trim(),
+    source_page: String(row.source_page || row.sourcePage || '').trim(),
+    job_slug: String(row.job_slug || row.jobSlug || '').trim(),
+    status: String(row.status || 'pending').toLowerCase(),
+    created_at: row.created_at || nowIso(),
+    updated_at: nowIso(),
+  };
+};
+
+async function getJobApplications() {
+  const existing = await prisma.setting.findUnique({ where: { key: JOB_APPLICATIONS_KEY } });
+  const value = existing?.value;
+  const rows = Array.isArray(value?.applications) ? value.applications : Array.isArray(value) ? value : [];
+  return rows.map(normalizeJobApplication);
+}
+
+async function saveJobApplications(applications) {
+  const normalized = applications.map(normalizeJobApplication);
+  await putSettingJson(JOB_APPLICATIONS_KEY, { applications: normalized, updated_at: nowIso() });
+  return normalized;
+}
+
 app.get('/api/public/job-listings', async (_req, res) => {
   try {
     const jobs = await getJobListings();
@@ -1873,6 +1913,62 @@ app.delete('/api/admin/job-listings/:id', async (req, res) => {
     res.status(204).end();
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to delete job listing', error: String(error) });
+  }
+});
+
+app.get('/api/admin/job-applications', async (_req, res) => {
+  try {
+    const rows = await getJobApplications();
+    const sorted = rows.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    res.json({ success: true, count: sorted.length, data: sorted });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to fetch job applications', error: String(error) });
+  }
+});
+
+app.post('/api/public/job-applications', async (req, res) => {
+  try {
+    const payload = req.body || {};
+    const normalized = normalizeJobApplication(payload);
+    if (!normalized.email || !normalized.first_name || !normalized.birth_date) {
+      return res.status(400).json({ success: false, message: 'Missing required fields' });
+    }
+
+    const current = await getJobApplications();
+    const next = [normalized, ...current];
+    await saveJobApplications(next);
+    res.status(201).json({ success: true, data: normalized });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to create job application', error: String(error) });
+  }
+});
+
+app.patch('/api/admin/job-applications/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    const patch = req.body || {};
+    const current = await getJobApplications();
+    const idx = current.findIndex((x) => x.id === id);
+    if (idx < 0) return res.status(404).json({ success: false, message: 'Job application not found' });
+
+    const merged = normalizeJobApplication({ ...current[idx], ...patch, id: current[idx].id, created_at: current[idx].created_at });
+    current[idx] = merged;
+    await saveJobApplications(current);
+    res.json({ success: true, data: merged });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to update job application', error: String(error) });
+  }
+});
+
+app.delete('/api/admin/job-applications/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    const current = await getJobApplications();
+    const next = current.filter((x) => x.id !== id);
+    await saveJobApplications(next);
+    res.status(204).end();
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to delete job application', error: String(error) });
   }
 });
 
