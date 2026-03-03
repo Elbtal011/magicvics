@@ -1726,6 +1726,12 @@ app.post(['/api/chat', '/api/chat/messages', '/api/chat/conversations/:id/messag
 
 const JOB_LISTINGS_KEY = 'job_listings_v1';
 
+const toList = (v) => {
+  if (Array.isArray(v)) return v.map((x) => String(x || '').trim()).filter(Boolean);
+  if (typeof v === 'string') return v.split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
+  return [];
+};
+
 const normalizeJobListing = (row = {}) => {
   const title = String(row.title || '').trim();
   const slugBase = String(row.slug || title)
@@ -1734,15 +1740,45 @@ const normalizeJobListing = (row = {}) => {
     .replace(/^-+|-+$/g, '')
     .slice(0, 80) || `job-${Math.random().toString(36).slice(2, 8)}`;
 
+  const brief = String(row.brief_description || row.briefDescription || row.summary || '').trim();
+  const description = String(row.description || row.summary || row.brief_description || '').trim();
+
+  const requirements = toList(row.requirements || row.profile);
+  const tasks = toList(row.tasks);
+  const benefits = toList(row.benefits || row.offer);
+
+  const facts = row.facts && typeof row.facts === 'object' ? { ...row.facts } : {};
+  if (!facts.employment) facts.employment = row.type_of_employment || row.employment_type || row.employmentType || null;
+  if (!facts.salary) facts.salary = row.ad_text || row.salary_text || null;
+  if (!facts.location) facts.location = row.location || null;
+
   return {
     id: row.id || `job_${Math.random().toString(36).slice(2, 10)}`,
     slug: slugBase,
     title,
-    summary: String(row.summary || row.description || '').trim(),
-    tasks: Array.isArray(row.tasks) ? row.tasks : [],
-    profile: Array.isArray(row.profile) ? row.profile : [],
-    offer: Array.isArray(row.offer) ? row.offer : [],
-    facts: row.facts && typeof row.facts === 'object' ? row.facts : {},
+
+    // legacy fields used by headline pages
+    summary: brief || description,
+    tasks,
+    profile: requirements,
+    offer: benefits,
+    facts,
+
+    // admin-form compatible aliases
+    brief_description: brief,
+    description,
+    type_of_employment: row.type_of_employment || row.employment_type || row.employmentType || '',
+    employment_type: row.employment_type || row.type_of_employment || row.employmentType || '',
+    working_model: row.working_model || row.workingModel || '',
+    location: row.location || '',
+    min_salary: row.min_salary ?? row.minSalary ?? 0,
+    max_salary: row.max_salary ?? row.maxSalary ?? 0,
+    salary_type: row.salary_type || row.salaryType || 'per month',
+    ad_text: row.ad_text || row.salary_text || '',
+    requirements,
+    benefits,
+    internal_tags: toList(row.internal_tags || row.tags),
+
     status: String(row.status || 'active').toLowerCase(),
     created_at: row.created_at || nowIso(),
     updated_at: nowIso()
@@ -1765,7 +1801,7 @@ async function saveJobListings(jobs) {
 app.get('/api/public/job-listings', async (_req, res) => {
   try {
     const jobs = await getJobListings();
-    const active = jobs.filter((j) => j.status === 'active');
+    const active = jobs.filter((j) => ['active', 'published', 'live'].includes(String(j.status || '').toLowerCase()));
     res.json({ success: true, count: active.length, data: active });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to fetch public job listings', error: String(error) });
