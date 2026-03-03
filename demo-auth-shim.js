@@ -109,9 +109,73 @@
     return patched;
   }
 
+  const jobUiCache = { at: 0, rows: null };
+
+  async function patchAppliedJobDisplay() {
+    const m = location.pathname.match(/^\/admin\/job-applications\/([^/?#]+)/i);
+    if (!m) return false;
+    const appId = decodeURIComponent(m[1]);
+
+    try {
+      const nowMs = Date.now();
+      if (!jobUiCache.rows || nowMs - jobUiCache.at > 15000) {
+        const resp = await fetch('/api/admin/job-applications');
+        const payload = await resp.json().catch(() => ({}));
+        jobUiCache.rows = Array.isArray(payload?.data) ? payload.data : [];
+        jobUiCache.at = nowMs;
+      }
+
+      const row = (jobUiCache.rows || []).find((x) => String(x.id) === String(appId));
+      if (!row) return false;
+
+      const appliedTitle =
+        (row.job_listing && row.job_listing.title) ||
+        row.position_applied ||
+        row.job_title ||
+        row.application_type ||
+        'Initiativbewerbung';
+
+      // Replace "Art der Bewerbung" value text (fallback for stale compiled UI logic).
+      const labels = Array.from(document.querySelectorAll('p,span,div')).filter((el) =>
+        (el.textContent || '').trim().toLowerCase() === 'art der bewerbung'
+      );
+      labels.forEach((labelEl) => {
+        const container = labelEl.closest('div');
+        if (!container) return;
+        const candidates = Array.from(container.querySelectorAll('p,span,div')).filter((el) => el !== labelEl);
+        const valueEl = candidates.find((el) => {
+          const txt = (el.textContent || '').trim();
+          return txt && txt.toLowerCase() === 'initiativbewerbung';
+        }) || candidates.find((el) => (el.textContent || '').trim().length > 0);
+
+        if (valueEl && valueEl.textContent !== appliedTitle) {
+          valueEl.textContent = appliedTitle;
+        }
+      });
+
+      // Add explicit row in personal information section.
+      const personalTitle = Array.from(document.querySelectorAll('h2,h3,h4')).find((el) =>
+        /persönliche informationen/i.test((el.textContent || '').trim())
+      );
+      const personalSection = personalTitle ? personalTitle.closest('div') : null;
+      if (personalSection && !personalSection.querySelector('[data-mv-applied-job-row="1"]')) {
+        const rowEl = document.createElement('div');
+        rowEl.setAttribute('data-mv-applied-job-row', '1');
+        rowEl.style.marginTop = '8px';
+        rowEl.innerHTML = `<div style="display:flex;align-items:center;gap:8px;color:#64748b;font-size:12px;">💼 <span>Beworbene Stelle</span></div><div style="font-weight:600;margin-top:2px;">${String(appliedTitle).replace(/</g, '&lt;')}</div>`;
+        personalSection.appendChild(rowEl);
+      }
+
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   const enforceUiPatches = () => {
     enforceBrand();
     patchSupportHelpIcon();
+    patchAppliedJobDisplay();
   };
 
   const run = () => {
