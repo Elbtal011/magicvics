@@ -1823,21 +1823,39 @@ const normalizeJobApplication = (row = {}) => {
   const lastName = String(row.last_name || row.lastName || '').trim();
   const fullName = String(row.full_name || row.fullName || [firstName, lastName].filter(Boolean).join(' ')).trim();
   const email = String(row.email || '').trim().toLowerCase();
+  const birthDate = String(row.birth_date || row.birthDate || row.date_of_birth || row.dob || '').trim();
+  const street = String(row.street || row.address || '').trim();
+  const postalCode = String(row.postal_code || row.zip || '').trim();
+  const city = String(row.city || '').trim();
+  const nationality = String(row.nationality || row.country || '').trim();
+  const jobTitle = String(row.job_title || row.position_applied || row.application_type || '').trim();
 
   return {
     id: row.id || `ja_${Math.random().toString(36).slice(2, 10)}`,
     first_name: firstName || fullName || 'Bewerber',
     last_name: lastName || '-',
     full_name: fullName || `${firstName} ${lastName}`.trim(),
+    name: fullName || `${firstName} ${lastName}`.trim(),
     email,
-    phone: String(row.phone || '').trim(),
-    birth_date: String(row.birth_date || row.birthDate || '').trim(),
-    address: String(row.address || '').trim(),
-    zip: String(row.zip || '').trim(),
-    city: String(row.city || '').trim(),
-    country: String(row.country || '').trim(),
+    phone: String(row.phone || row.mobile || row.mobile_number || '').trim(),
+    mobile: String(row.mobile || row.phone || row.mobile_number || '').trim(),
+    mobile_number: String(row.mobile_number || row.mobile || row.phone || '').trim(),
+    birth_date: birthDate,
+    date_of_birth: birthDate,
+    dob: birthDate,
+    address: String(row.address || row.full_address || street).trim(),
+    full_address: String(row.full_address || [street, [postalCode, city].filter(Boolean).join(' ')].filter(Boolean).join(', ')).trim(),
+    street,
+    zip: postalCode,
+    postal_code: postalCode,
+    city,
+    country: String(row.country || nationality).trim(),
+    nationality,
     source_page: String(row.source_page || row.sourcePage || '').trim(),
     job_slug: String(row.job_slug || row.jobSlug || '').trim(),
+    job_title: jobTitle,
+    position_applied: String(row.position_applied || jobTitle).trim(),
+    application_type: String(row.application_type || jobTitle || 'Initiativbewerbung').trim(),
     status: String(row.status || 'pending').toLowerCase(),
     created_at: row.created_at || nowIso(),
     updated_at: nowIso(),
@@ -1929,6 +1947,18 @@ app.get('/api/admin/job-applications', async (_req, res) => {
 app.post('/api/public/job-applications', async (req, res) => {
   try {
     const payload = req.body || {};
+
+    // Backfill job title from slug when available so admin shows exact applied position.
+    if ((!payload.job_title && !payload.position_applied && !payload.application_type) && payload.job_slug) {
+      const jobs = await getJobListings();
+      const match = jobs.find((j) => j.slug === String(payload.job_slug));
+      if (match?.title) {
+        payload.job_title = match.title;
+        payload.position_applied = match.title;
+        payload.application_type = match.title;
+      }
+    }
+
     const normalized = normalizeJobApplication(payload);
     if (!normalized.email || !normalized.first_name || !normalized.birth_date) {
       return res.status(400).json({ success: false, message: 'Missing required fields' });
