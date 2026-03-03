@@ -31,6 +31,47 @@ const num = (v, fallback = 0) => {
   return Number.isFinite(n) ? n : fallback;
 };
 
+const OPENAI_API_KEY = String(process.env.OPENAI_API_KEY || '').trim();
+const OPENAI_MODEL = String(process.env.OPENAI_MODEL || 'gpt-4o-mini').trim();
+
+const defaultChatReply = (content) => `Danke für deine Nachricht: "${String(content || '').slice(0, 120)}". Ein Admin kann jederzeit eingreifen.`;
+
+async function generateOpenAIReply({ content, history = [] }) {
+  if (!OPENAI_API_KEY) return null;
+
+  const messages = [
+    {
+      role: 'system',
+      content:
+        'Du bist der Karriere- und Support-Assistent von MagicVics/Headline. Antworte kurz, hilfreich und auf Deutsch. Wenn Informationen fehlen, stelle eine kurze Rückfrage. Erfinde keine Fakten.'
+    },
+    ...history,
+    { role: 'user', content: String(content || '') }
+  ];
+
+  const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${OPENAI_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: OPENAI_MODEL,
+      temperature: 0.4,
+      messages
+    })
+  });
+
+  if (!resp.ok) {
+    const errText = await resp.text().catch(() => '');
+    throw new Error(`OpenAI error ${resp.status}: ${errText.slice(0, 200)}`);
+  }
+
+  const data = await resp.json();
+  const out = data?.choices?.[0]?.message?.content;
+  return String(out || '').trim() || null;
+}
+
 const profileNameFromInput = (body = {}) => {
   const first = (body.first_name || body.firstName || '').trim();
   const last = (body.last_name || body.lastName || '').trim();
@@ -1690,15 +1731,36 @@ app.post(['/api/chat', '/api/chat/messages', '/api/chat/conversations/:id/messag
     updated_at: now
   };
 
-  // deterministic auto-reply for demo feel
+  const prior = state.messages
+    .filter((m) => m.conversation_id === conversationId && !m.deleted_at)
+    .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+    .slice(-8)
+    .map((m) => ({
+      role: m.sender_type === 'ai' ? 'assistant' : 'user',
+      content: String(m.content || '')
+    }))
+    .filter((m) => m.content);
+
+  let aiContent = null;
+  let aiMeta = { auto_reply: true, provider: 'fallback' };
+  try {
+    const llm = await generateOpenAIReply({ content, history: prior });
+    if (llm) {
+      aiContent = llm;
+      aiMeta = { auto_reply: true, provider: 'openai', model: OPENAI_MODEL };
+    }
+  } catch (err) {
+    console.error('[chat] openai failed, falling back:', err?.message || err);
+  }
+
   const aiMsg = {
     id: makeId('msg'),
     conversation_id: conversationId,
     sender_type: 'ai',
     sender_id: null,
-    content: `Danke für deine Nachricht: "${content.slice(0, 120)}". Ein Admin kann jederzeit eingreifen.`,
+    content: aiContent || defaultChatReply(content),
     message_type: 'text',
-    metadata: { auto_reply: true },
+    metadata: aiMeta,
     deleted_at: null,
     edited_at: null,
     created_at: new Date(Date.now() + 250).toISOString(),
