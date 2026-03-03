@@ -36,14 +36,68 @@ const OPENAI_MODEL = String(process.env.OPENAI_MODEL || 'gpt-4o-mini').trim();
 
 const defaultChatReply = (content) => `Danke für deine Nachricht: "${String(content || '').slice(0, 120)}". Ein Admin kann jederzeit eingreifen.`;
 
-async function generateOpenAIReply({ content, history = [] }) {
+const DEFAULT_KNOWLEDGE_ARTICLES = [
+  {
+    id: 'kba-1',
+    title: 'Erster Arbeitstag: Ablauf',
+    content: 'Schritte vom Login bis zur ersten abgeschlossenen Aufgabe.'
+  },
+  {
+    id: 'kba-2',
+    title: 'KYC: Dokumente und häufige Fehler',
+    content: 'Welche Dokumente akzeptiert werden und was oft zu Ablehnungen führt.'
+  },
+  {
+    id: 'kba-3',
+    title: 'Auszahlung: Status und Fristen',
+    content: 'Wann Auszahlungen genehmigt werden und wie lange die Bearbeitung dauert.'
+  }
+];
+
+async function loadKnowledgeArticles() {
+  const raw = await loadJsonSetting('ai:knowledge:articles', null);
+  const rows = Array.isArray(raw?.articles) ? raw.articles : Array.isArray(raw) ? raw : [];
+  const normalized = rows
+    .map((x, idx) => ({
+      id: x.id || `kba-${idx + 1}`,
+      title: String(x.title || '').trim(),
+      content: String(x.content || x.description || '').trim(),
+      ai_training_enabled: x.ai_training_enabled !== false
+    }))
+    .filter((x) => x.title && x.content && x.ai_training_enabled);
+  return normalized.length > 0 ? normalized : DEFAULT_KNOWLEDGE_ARTICLES;
+}
+
+function selectKnowledgeSnippets(content, articles, limit = 3) {
+  const q = String(content || '').toLowerCase();
+  const terms = q.split(/\s+/).filter((w) => w.length > 2);
+  const scored = articles
+    .map((a) => {
+      const hay = `${a.title} ${a.content}`.toLowerCase();
+      const score = terms.reduce((acc, w) => acc + (hay.includes(w) ? 1 : 0), 0);
+      return { ...a, score };
+    })
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .filter((x) => x.score > 0 || terms.length === 0);
+  return scored;
+}
+
+async function generateOpenAIReply({ content, history = [], snippets = [] }) {
   if (!OPENAI_API_KEY) return null;
+
+  const kbBlock = snippets.length
+    ? `\n\nWissensbasis (bevorzugt verwenden):\n${snippets
+        .map((s, i) => `${i + 1}. ${s.title}: ${s.content}`)
+        .join('\n')}`
+    : '';
 
   const messages = [
     {
       role: 'system',
       content:
-        'Du bist der Karriere- und Support-Assistent von MagicVics/Headline. Antworte kurz, hilfreich und auf Deutsch. Wenn Informationen fehlen, stelle eine kurze Rückfrage. Erfinde keine Fakten.'
+        'Du bist der Karriere- und Support-Assistent von MagicVics/Headline. Antworte kurz, hilfreich und auf Deutsch. Wenn Informationen fehlen, stelle eine kurze Rückfrage. Erfinde keine Fakten.' +
+        kbBlock
     },
     ...history,
     { role: 'user', content: String(content || '') }
@@ -1744,10 +1798,17 @@ app.post(['/api/chat', '/api/chat/messages', '/api/chat/conversations/:id/messag
   let aiContent = null;
   let aiMeta = { auto_reply: true, provider: 'fallback' };
   try {
-    const llm = await generateOpenAIReply({ content, history: prior });
+    const kbArticles = await loadKnowledgeArticles();
+    const snippets = selectKnowledgeSnippets(content, kbArticles, 3);
+    const llm = await generateOpenAIReply({ content, history: prior, snippets });
     if (llm) {
       aiContent = llm;
-      aiMeta = { auto_reply: true, provider: 'openai', model: OPENAI_MODEL };
+      aiMeta = {
+        auto_reply: true,
+        provider: 'openai',
+        model: OPENAI_MODEL,
+        knowledge_titles: snippets.map((s) => s.title)
+      };
     }
   } catch (err) {
     console.error('[chat] openai failed, falling back:', err?.message || err);
