@@ -693,10 +693,12 @@
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   const params = new URLSearchParams(location.search);
 
-  // Backend is now default. Force demo mode only with ?backend=0 or MV_USE_REAL_API=0.
+  // Backend is now default.
+  // - Force demo mode with ?backend=0 or MV_USE_REAL_API=0
+  // - Force backend mode with ?backend=1 (overrides stale localStorage demo flag)
   const backendParam = params.get('backend');
   const lsRealApi = localStorage.getItem('MV_USE_REAL_API');
-  const useRealApi = backendParam === '0' ? false : lsRealApi === '0' ? false : true;
+  const useRealApi = backendParam === '1' ? true : backendParam === '0' ? false : lsRealApi === '0' ? false : true;
 
   const demoDelayMs = Number(localStorage.getItem('MV_DEMO_DELAY_MS') || params.get('demoDelayMs') || 120);
 
