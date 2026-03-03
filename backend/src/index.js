@@ -2153,6 +2153,155 @@ app.delete('/api/admin/job-applications/:id', async (req, res) => {
   }
 });
 
+// ---- Task template + assignment compatibility (for admin templates flow) ----
+const TASK_TEMPLATES_KEY = 'task_templates_v1';
+const TASK_ASSIGNMENTS_KEY = 'task_assignments_v1';
+
+const normalizeTaskTemplate = (row = {}) => ({
+  id: row.id || `tt_${Math.random().toString(36).slice(2, 10)}`,
+  title: String(row.title || '').trim(),
+  description: String(row.description || '').trim(),
+  type: String(row.type || 'standard').trim(),
+  priority: String(row.priority || 'medium').toLowerCase(),
+  estimated_hours: Number(row.estimated_hours ?? row.estimatedHours ?? 1) || 1,
+  is_starter_job: Boolean(row.is_starter_job),
+  order_number: row.is_starter_job ? null : (row.order_number ?? null),
+  required_attachments: Array.isArray(row.required_attachments) ? row.required_attachments : [],
+  steps: Array.isArray(row.steps) ? row.steps : [],
+  payment_amount: row.payment_amount ?? null,
+  created_by: row.created_by || null,
+  created_at: row.created_at || nowIso(),
+  updated_at: nowIso()
+});
+
+const normalizeTaskAssignment = (row = {}) => ({
+  id: row.id || `asg_${Math.random().toString(36).slice(2, 10)}`,
+  task_id: row.task_id || `task_${Math.random().toString(36).slice(2, 10)}`,
+  task_template_id: String(row.task_template_id || '').trim(),
+  assignee_id: String(row.assignee_id || '').trim(),
+  status: String(row.status || 'pending').toLowerCase(),
+  due_date: row.due_date || new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+  created_by: row.created_by || null,
+  current_step: Number(row.current_step ?? 0),
+  created_at: row.created_at || nowIso(),
+  updated_at: nowIso()
+});
+
+async function getTaskTemplates() {
+  const existing = await prisma.setting.findUnique({ where: { key: TASK_TEMPLATES_KEY } });
+  const value = existing?.value;
+  const rows = Array.isArray(value?.templates) ? value.templates : Array.isArray(value) ? value : [];
+  return rows.map(normalizeTaskTemplate);
+}
+
+async function saveTaskTemplates(templates) {
+  const normalized = templates.map(normalizeTaskTemplate);
+  await putSettingJson(TASK_TEMPLATES_KEY, { templates: normalized, updated_at: nowIso() });
+  return normalized;
+}
+
+async function getTaskAssignments() {
+  const existing = await prisma.setting.findUnique({ where: { key: TASK_ASSIGNMENTS_KEY } });
+  const value = existing?.value;
+  const rows = Array.isArray(value?.assignments) ? value.assignments : Array.isArray(value) ? value : [];
+  return rows.map(normalizeTaskAssignment);
+}
+
+async function saveTaskAssignments(assignments) {
+  const normalized = assignments.map(normalizeTaskAssignment);
+  await putSettingJson(TASK_ASSIGNMENTS_KEY, { assignments: normalized, updated_at: nowIso() });
+  return normalized;
+}
+
+app.get('/api/admin/task-templates', async (_req, res) => {
+  try {
+    const rows = await getTaskTemplates();
+    res.json({ success: true, count: rows.length, data: rows });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to fetch task templates', error: String(error) });
+  }
+});
+
+app.post('/api/admin/task-templates', async (req, res) => {
+  try {
+    const payload = Array.isArray(req.body) ? req.body : [req.body || {}];
+    const current = await getTaskTemplates();
+    const next = [...current, ...payload.map(normalizeTaskTemplate)];
+    const saved = await saveTaskTemplates(next);
+    res.status(201).json({ success: true, data: saved.slice(-payload.length) });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to create task template', error: String(error) });
+  }
+});
+
+app.patch('/api/admin/task-templates/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    const patch = req.body || {};
+    const current = await getTaskTemplates();
+    const idx = current.findIndex((t) => t.id === id);
+    if (idx < 0) return res.status(404).json({ success: false, message: 'Task template not found' });
+    const merged = normalizeTaskTemplate({ ...current[idx], ...patch, id: current[idx].id, created_at: current[idx].created_at });
+    current[idx] = merged;
+    await saveTaskTemplates(current);
+    res.json({ success: true, data: merged });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to update task template', error: String(error) });
+  }
+});
+
+app.delete('/api/admin/task-templates/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+    const current = await getTaskTemplates();
+    const next = current.filter((t) => t.id !== id);
+    await saveTaskTemplates(next);
+    res.status(204).end();
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to delete task template', error: String(error) });
+  }
+});
+
+app.post('/api/admin/task-assignments/from-template', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const templateId = String(body.task_template_id || body.p_template_id || body.template_id || '').trim();
+    const assigneeId = String(body.assignee_id || body.p_assignee_id || body.user_id || '').trim();
+    if (!templateId || !assigneeId) {
+      return res.status(400).json({ success: false, message: 'task_template_id and assignee_id are required' });
+    }
+
+    const [templates, assignments] = await Promise.all([getTaskTemplates(), getTaskAssignments()]);
+    const template = templates.find((t) => t.id === templateId);
+    if (!template) return res.status(404).json({ success: false, message: 'Task template not found' });
+
+    const duplicate = assignments.find((a) => a.task_template_id === templateId && a.assignee_id === assigneeId && a.status !== 'rejected' && a.status !== 'canceled');
+    if (duplicate) {
+      return res.json({ success: true, data: { task_id: duplicate.task_id, assignment_id: duplicate.id, message: 'Already assigned' } });
+    }
+
+    const created = normalizeTaskAssignment({
+      task_template_id: templateId,
+      assignee_id: assigneeId,
+      due_date: body.due_date || body.p_due_date,
+      created_by: body.created_by || body.p_created_by || null,
+      status: 'pending'
+    });
+
+    await saveTaskAssignments([created, ...assignments]);
+    res.status(201).json({
+      success: true,
+      data: {
+        task_id: created.task_id,
+        assignment_id: created.id,
+        message: 'Task assignment created'
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to create task assignment', error: String(error) });
+  }
+});
+
 app.get('/api/postident/status/:id', async (req, res) => {
   const requestId = req.params.id;
   const key = `postident:status:${requestId}`;

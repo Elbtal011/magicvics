@@ -1041,6 +1041,73 @@
       return json({ message: `Unsupported method ${method} for bridged table ${table}` }, 405);
     }
 
+    if (useRealApi && table === 'task_templates') {
+      const toAdmin = '/api/admin/task-templates';
+
+      if (method === 'GET' || method === 'HEAD') {
+        const resp = await originalFetch(toAdmin, { method: 'GET', headers: init?.headers });
+        if (!resp.ok) return json({ message: 'Failed to fetch task templates' }, 502);
+        const payload = await resp.json().catch(() => ({}));
+        const rows = Array.isArray(payload?.data) ? payload.data : [];
+        const filteredRows = applyQuery(rows, urlObj.searchParams);
+
+        if (method === 'HEAD') {
+          const totalCount = filteredRows.length;
+          return new Response('', {
+            status: 200,
+            headers: { 'content-range': `0-${Math.max(0, totalCount - 1)}/${totalCount}` }
+          });
+        }
+
+        const accept = (asHeaders(init?.headers).get('accept') || '').toLowerCase();
+        const wantsSingle = accept.includes('vnd.pgrst.object+json');
+        if (wantsSingle) return filteredRows[0] ? json(filteredRows[0]) : json({ message: 'No rows' }, 406);
+        const totalCount = filteredRows.length;
+        return json(filteredRows, 200, { 'content-range': `0-${Math.max(0, totalCount - 1)}/${totalCount}` });
+      }
+
+      if (method === 'POST') {
+        const body = normalizeBody(init?.body);
+        const entries = Array.isArray(body) ? body : [body];
+        const resp = await originalFetch(toAdmin, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(entries)
+        });
+        if (!resp.ok) return json({ message: 'Failed to create task template' }, 502);
+        const payload = await resp.json().catch(() => ({}));
+        const created = Array.isArray(payload?.data) ? payload.data : [];
+        return getPrefer(init?.headers).includes('return=representation') ? json(created) : noContent(201);
+      }
+
+      if (method === 'PATCH' || method === 'PUT') {
+        const body = normalizeBody(init?.body);
+        const idFilter = (urlObj.searchParams.get('id') || '').toString();
+        const id = idFilter.startsWith('eq.') ? decodeURIComponent(idFilter.slice(3)) : null;
+        if (!id) return json({ message: 'Missing id filter for update' }, 400);
+        const resp = await originalFetch(`${toAdmin}/${encodeURIComponent(id)}`, {
+          method: 'PATCH',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        if (!resp.ok) return json({ message: 'Failed to update task template' }, 502);
+        const payload = await resp.json().catch(() => ({}));
+        const updated = payload?.data ? [payload.data] : [];
+        return getPrefer(init?.headers).includes('return=representation') ? json(updated) : noContent();
+      }
+
+      if (method === 'DELETE') {
+        const idFilter = (urlObj.searchParams.get('id') || '').toString();
+        const id = idFilter.startsWith('eq.') ? decodeURIComponent(idFilter.slice(3)) : null;
+        if (!id) return json({ message: 'Missing id filter for delete' }, 400);
+        const resp = await originalFetch(`${toAdmin}/${encodeURIComponent(id)}`, { method: 'DELETE' });
+        if (!resp.ok) return json({ message: 'Failed to delete task template' }, 502);
+        return noContent();
+      }
+
+      return json({ message: `Unsupported method ${method} for bridged table ${table}` }, 405);
+    }
+
     const rows = store.get(table) || [];
     const select = urlObj.searchParams.get('select');
     const filtered = applyQuery(rows, urlObj.searchParams);
@@ -1178,7 +1245,28 @@
       });
       return Array.from(byId.values());
     },
-    get_profiles_with_emails_complete: () => {
+    get_profiles_with_emails_complete: async () => {
+      if (useRealApi) {
+        try {
+          const resp = await originalFetch('/api/admin/users', { method: 'GET' });
+          if (resp.ok) {
+            const payload = await resp.json().catch(() => ({}));
+            const users = Array.isArray(payload?.users) ? payload.users : [];
+            return users
+              .filter((u) => String(u.role || '').toLowerCase() === 'user')
+              .map((u) => ({
+                id: u.id,
+                first_name: u.first_name || u.user_metadata?.first_name || '',
+                last_name: u.last_name || u.user_metadata?.last_name || '',
+                email: u.email || '',
+                role: 'user'
+              }));
+          }
+        } catch (_err) {
+          // fall through to demo store
+        }
+      }
+
       const profiles = store.get('profiles') || [];
       const employees = store.get('employees') || [];
       const merged = [...profiles, ...employees];
@@ -1191,9 +1279,33 @@
       });
       return Array.from(byId.values());
     },
-    get_profiles_with_emails_by_ids: (init) => {
+    get_profiles_with_emails_by_ids: async (init) => {
       const body = normalizeBody(init?.body);
       const ids = body.profile_ids || body.ids || [];
+
+      if (useRealApi) {
+        try {
+          const resp = await originalFetch('/api/admin/users', { method: 'GET' });
+          if (resp.ok) {
+            const payload = await resp.json().catch(() => ({}));
+            const users = Array.isArray(payload?.users) ? payload.users : [];
+            const combined = users
+              .filter((u) => String(u.role || '').toLowerCase() === 'user')
+              .map((u) => ({
+                id: u.id,
+                first_name: u.first_name || u.user_metadata?.first_name || '',
+                last_name: u.last_name || u.user_metadata?.last_name || '',
+                email: u.email || '',
+                role: 'user'
+              }));
+            if (!Array.isArray(ids) || ids.length === 0) return combined;
+            return combined.filter((p) => ids.includes(p.id));
+          }
+        } catch (_err) {
+          // fall through to demo store
+        }
+      }
+
       const profiles = store.get('profiles') || [];
       const employees = store.get('employees') || [];
       const combined = [...profiles, ...employees].map((p) => ({
@@ -1207,9 +1319,51 @@
       return combined.filter((p) => ids.includes(p.id));
     },
     ping: () => ({ ok: true, mode: 'demo' }),
-    create_task_assignment_safe: () => ([{ task_id: randomId('task'), assignment_id: randomId('asg'), message: 'Demo assignment created' }]),
+    create_task_assignment_safe: async (init) => {
+      const body = normalizeBody(init?.body);
+      if (useRealApi) {
+        try {
+          const resp = await originalFetch('/api/admin/task-assignments/from-template', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              task_template_id: body.p_template_id || body.task_template_id,
+              assignee_id: body.p_assignee_id || body.assignee_id,
+              due_date: body.p_due_date || body.due_date,
+              created_by: body.p_created_by || body.created_by,
+              custom_payment_amount: body.p_custom_payment_amount || body.custom_payment_amount || null
+            })
+          });
+          if (resp.ok) {
+            const payload = await resp.json().catch(() => ({}));
+            const data = payload?.data || {};
+            return [{
+              task_id: data.task_id || randomId('task'),
+              assignment_id: data.assignment_id || randomId('asg'),
+              message: data.message || 'Task assignment created'
+            }];
+          }
+        } catch (_err) {
+          // fall through to demo behavior
+        }
+      }
+      return [{ task_id: randomId('task'), assignment_id: randomId('asg'), message: 'Demo assignment created' }];
+    },
     create_signed_contract_assignment: () => ({ ok: true, mode: 'demo', message: 'Demo contract assignment created' }),
-    get_all_task_templates: () => (store.get('task_templates') || [])
+    get_all_task_templates: async () => {
+      if (useRealApi) {
+        try {
+          const resp = await originalFetch('/api/admin/task-templates', { method: 'GET' });
+          if (resp.ok) {
+            const payload = await resp.json().catch(() => ({}));
+            return Array.isArray(payload?.data) ? payload.data : [];
+          }
+        } catch (_err) {
+          // fall through to demo store
+        }
+      }
+      return (store.get('task_templates') || []);
+    }
   };
 
   const passthroughNoop = (endpoint, method) => {
@@ -1272,7 +1426,7 @@
       const u = new URL(url, location.origin);
       const rpc = u.pathname.split('/rest/v1/rpc/')[1];
       const handler = rpcHandlers[rpc];
-      if (handler) return json(handler(mergedInit));
+      if (handler) return json(await Promise.resolve(handler(mergedInit)));
       return json({ ok: true, rpc, mode: 'demo', message: 'No-op demo RPC success' });
     }
 
