@@ -1940,18 +1940,27 @@ app.get('/api/admin/job-applications', async (_req, res) => {
     const bySlug = new Map(jobs.map((j) => [String(j.slug || ''), j]));
 
     const enriched = rows.map((r) => {
+      const job = bySlug.get(String(r.job_slug || '').trim());
       const appType = String(r.application_type || '').trim();
       const isGeneric = !appType || /^initiativbewerbung$/i.test(appType);
-      if (!isGeneric) return r;
 
-      const job = bySlug.get(String(r.job_slug || '').trim());
-      if (!job?.title) return r;
+      const patchedType = isGeneric && job?.title ? job.title : (r.application_type || r.position_applied || r.job_title || 'Initiativbewerbung');
 
       return {
         ...r,
-        job_title: r.job_title || job.title,
-        position_applied: r.position_applied || job.title,
-        application_type: job.title,
+        job_title: r.job_title || job?.title || '',
+        position_applied: r.position_applied || job?.title || '',
+        application_type: patchedType,
+        job_listing: job
+          ? {
+              id: job.id,
+              slug: job.slug,
+              title: job.title,
+              employment_type: job.employment_type || job.type_of_employment || '',
+              work_model: job.work_model || job.working_model || '',
+              location: job.location || '',
+            }
+          : null,
       };
     });
 
