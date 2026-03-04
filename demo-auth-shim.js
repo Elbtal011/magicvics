@@ -1615,12 +1615,19 @@
     }
 
     if (url.includes('/api/')) {
+      const u = new URL(url, location.origin);
+      const path = u.pathname;
+
       if (useRealApi) {
+        // Some deployments don't expose this route on the frontend host.
+        // Force direct backend call for KYC document proxy endpoint.
+        if (path === '/api/admin/kyc-document') {
+          const backendBase = 'https://backend-production-4c3c.up.railway.app';
+          return originalFetch(`${backendBase}${u.pathname}${u.search}`, init);
+        }
         return originalFetch(input, init);
       }
 
-      const u = new URL(url, location.origin);
-      const path = u.pathname;
 
       // Chat monitoring endpoints used by /admin/chat-monitoring
       const paginate = (items, page = 1, limit = 20) => {

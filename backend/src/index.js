@@ -1217,7 +1217,18 @@ const toHeadlineProxyAssetUrl = (v) => {
 
 app.get('/api/admin/kyc-document', async (req, res) => {
   try {
-    const rawPath = String(req.query?.path || '').trim().replace(/^\/+/, '');
+    let rawPath = String(req.query?.path || '').trim();
+    // tolerate double-encoded paths from frontend widgets
+    for (let i = 0; i < 2; i += 1) {
+      try {
+        const dec = decodeURIComponent(rawPath);
+        if (dec === rawPath) break;
+        rawPath = dec;
+      } catch {
+        break;
+      }
+    }
+    rawPath = rawPath.replace(/^\/+/, '');
     if (!rawPath || !rawPath.startsWith('uploads/webid/')) {
       return res.status(400).json({ success: false, message: 'Invalid document path' });
     }
