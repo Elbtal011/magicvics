@@ -2156,6 +2156,7 @@ app.delete('/api/admin/job-applications/:id', async (req, res) => {
 // ---- Task template + assignment compatibility (for admin templates flow) ----
 const TASK_TEMPLATES_KEY = 'task_templates_v1';
 const TASK_ASSIGNMENTS_KEY = 'task_assignments_v1';
+const TASK_RATINGS_KEY = 'task_ratings_v1';
 
 const normalizeTaskTemplate = (row = {}) => ({
   id: row.id || `tt_${Math.random().toString(36).slice(2, 10)}`,
@@ -2211,6 +2212,34 @@ async function getTaskAssignments() {
 async function saveTaskAssignments(assignments) {
   const normalized = assignments.map(normalizeTaskAssignment);
   await putSettingJson(TASK_ASSIGNMENTS_KEY, { assignments: normalized, updated_at: nowIso() });
+  return normalized;
+}
+
+const normalizeTaskRating = (row = {}) => ({
+  id: row.id || `tr_${Math.random().toString(36).slice(2, 10)}`,
+  task_assignment_id: String(row.task_assignment_id || '').trim(),
+  rating_type: String(row.rating_type || 'initial').trim(),
+  status: String(row.status || 'pending').toLowerCase(),
+  rating_data: row.rating_data && typeof row.rating_data === 'object' ? row.rating_data : {},
+  submitted_at: row.submitted_at || nowIso(),
+  reviewed_at: row.reviewed_at || null,
+  reviewed_by: row.reviewed_by || null,
+  rejection_reason: row.rejection_reason || null,
+  admin_notes: row.admin_notes || null,
+  created_at: row.created_at || nowIso(),
+  updated_at: nowIso()
+});
+
+async function getTaskRatings() {
+  const existing = await prisma.setting.findUnique({ where: { key: TASK_RATINGS_KEY } });
+  const value = existing?.value;
+  const rows = Array.isArray(value?.ratings) ? value.ratings : Array.isArray(value) ? value : [];
+  return rows.map(normalizeTaskRating);
+}
+
+async function saveTaskRatings(ratings) {
+  const normalized = ratings.map(normalizeTaskRating);
+  await putSettingJson(TASK_RATINGS_KEY, { ratings: normalized, updated_at: nowIso() });
   return normalized;
 }
 
@@ -2356,7 +2385,29 @@ app.patch('/api/admin/task-assignments/:id', async (req, res) => {
     const idx = current.findIndex((a) => a.id === id);
     if (idx < 0) return res.status(404).json({ success: false, message: 'Task assignment not found' });
 
-    const merged = normalizeTaskAssignment({ ...current[idx], ...patch, id: current[idx].id, created_at: current[idx].created_at });
+    const currentRow = current[idx];
+    let requestedStatus = String(patch.status || currentRow.status || '').toLowerCase();
+
+    // Stage-1 approval should move task into ratings queue (in_review), not complete directly.
+    if (['completed', 'approved', 'genehmigt'].includes(requestedStatus)) {
+      const ratings = await getTaskRatings();
+      const hasApprovedRating = ratings.some((r) => r.task_assignment_id === id && r.status === 'approved');
+      if (!hasApprovedRating) {
+        requestedStatus = 'in_review';
+        const hasPending = ratings.some((r) => r.task_assignment_id === id && r.status === 'pending');
+        if (!hasPending) {
+          const created = normalizeTaskRating({
+            task_assignment_id: id,
+            rating_type: 'initial',
+            status: 'pending',
+            submitted_at: nowIso()
+          });
+          await saveTaskRatings([created, ...ratings]);
+        }
+      }
+    }
+
+    const merged = normalizeTaskAssignment({ ...currentRow, ...patch, status: requestedStatus, id: currentRow.id, created_at: currentRow.created_at });
     current[idx] = merged;
     await saveTaskAssignments(current);
 
@@ -2364,6 +2415,74 @@ app.patch('/api/admin/task-assignments/:id', async (req, res) => {
     res.json({ success: true, data: enriched[0] || merged });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to update task assignment', error: String(error) });
+  }
+});
+
+const enrichTaskRatings = async (ratings) => {
+  const assignments = await getTaskAssignments();
+  const byAssignmentId = new Map(assignments.map((a) => [a.id, a]));
+  const relatedAssignments = ratings
+    .map((r) => byAssignmentId.get(r.task_assignment_id))
+    .filter(Boolean);
+  const enrichedAssignments = await enrichTaskAssignments(relatedAssignments);
+  const enrichedById = new Map(enrichedAssignments.map((a) => [a.id, a]));
+
+  return ratings.map((r) => ({
+    ...r,
+    task_assignments: enrichedById.get(r.task_assignment_id) || null
+  }));
+};
+
+app.get('/api/admin/task-ratings', async (_req, res) => {
+  try {
+    const ratings = await getTaskRatings();
+    const enriched = await enrichTaskRatings(ratings);
+    res.json({ success: true, count: enriched.length, data: enriched });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to fetch task ratings', error: String(error) });
+  }
+});
+
+app.post('/api/admin/task-ratings', async (req, res) => {
+  try {
+    const payload = Array.isArray(req.body) ? req.body : [req.body || {}];
+    const currentRatings = await getTaskRatings();
+    const created = payload.map(normalizeTaskRating);
+    await saveTaskRatings([...created, ...currentRatings]);
+    const enriched = await enrichTaskRatings(created);
+    res.status(201).json({ success: true, data: enriched });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to create task rating', error: String(error) });
+  }
+});
+
+app.patch('/api/admin/task-ratings/:id', async (req, res) => {
+  try {
+    const id = String(req.params.id || '').trim();
+    const patch = req.body || {};
+    const ratings = await getTaskRatings();
+    const idx = ratings.findIndex((r) => r.id === id);
+    if (idx < 0) return res.status(404).json({ success: false, message: 'Task rating not found' });
+
+    const currentRating = ratings[idx];
+    const nextRating = normalizeTaskRating({ ...currentRating, ...patch, id: currentRating.id, created_at: currentRating.created_at });
+    ratings[idx] = nextRating;
+    await saveTaskRatings(ratings);
+
+    // Final approval in Aufgaben-Bewertungen marks assignment completed.
+    if (String(nextRating.status || '').toLowerCase() === 'approved') {
+      const assignments = await getTaskAssignments();
+      const aIdx = assignments.findIndex((a) => a.id === nextRating.task_assignment_id);
+      if (aIdx >= 0) {
+        assignments[aIdx] = normalizeTaskAssignment({ ...assignments[aIdx], status: 'completed', updated_at: nowIso() });
+        await saveTaskAssignments(assignments);
+      }
+    }
+
+    const enriched = await enrichTaskRatings([nextRating]);
+    res.json({ success: true, data: enriched[0] || nextRating });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to update task rating', error: String(error) });
   }
 });
 
