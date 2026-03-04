@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
+import nodemailer from 'nodemailer';
 
 dotenv.config();
 
@@ -957,16 +958,74 @@ app.post('/api/balance/add-bonus', async (req, res) => {
   });
 });
 
+const maybeSendSmtpEmail = async (template, payload = {}) => {
+  const row = await prisma.setting.findUnique({ where: { key: 'email:providers' } });
+  const cfg = row?.value || {};
+  const smtp = cfg?.providers?.smtp || {};
+  const active = String(cfg?.active_provider || 'smtp').toLowerCase();
+
+  const user = String(smtp.username || smtp.user || '').trim();
+  const pass = String(smtp.password || smtp.pass || '').trim();
+  const host = String(smtp.host || '').trim();
+  const to = String(payload?.to || payload?.email || '').trim();
+
+  if (active !== 'smtp') return { sent: false, reason: 'provider_not_smtp' };
+  if (!smtp?.enabled) return { sent: false, reason: 'smtp_disabled' };
+  if (!host || !user || !pass || !to) return { sent: false, reason: 'smtp_incomplete' };
+
+  const secure = Boolean(smtp.secure);
+  const port = Number(smtp.port) || (secure ? 465 : 587);
+  const fromEmail = String(smtp.from_email || user).trim();
+  const fromName = String(smtp.from_name || 'MagicVics').trim();
+  const from = fromName ? `${fromName} <${fromEmail}>` : fromEmail;
+
+  const registrationUrl = String(payload?.registration_url || payload?.registrationUrl || '').trim();
+  const fullName = String(payload?.full_name || `${payload?.first_name || ''} ${payload?.last_name || ''}`).trim() || 'Guten Tag';
+
+  const subject = template === 'job-application-approved-registration-link'
+    ? (String(payload?.subject || '').trim() || 'Ihre Bewerbung wurde angenommen – Registrierung starten')
+    : (String(payload?.subject || '').trim() || 'Neue Nachricht');
+
+  const text = template === 'job-application-approved-registration-link'
+    ? `Hallo ${fullName},\n\nIhre Bewerbung wurde angenommen. Bitte registrieren Sie Ihr Konto über diesen Link:\n${registrationUrl}\n\nViele Grüße\n${fromName}`
+    : String(payload?.text || payload?.message || '');
+
+  const html = template === 'job-application-approved-registration-link'
+    ? `<p>Hallo ${fullName},</p><p>Ihre Bewerbung wurde angenommen.</p><p>Bitte registrieren Sie Ihr Konto über diesen Link:</p><p><a href="${registrationUrl}">${registrationUrl}</a></p><p>Viele Grüße<br/>${fromName}</p>`
+    : String(payload?.html || '').trim() || undefined;
+
+  const transporter = nodemailer.createTransport({
+    host,
+    port,
+    secure,
+    auth: { user, pass }
+  });
+
+  const info = await transporter.sendMail({ from, to, subject, text, html });
+  return { sent: true, provider: 'smtp', message_id: info?.messageId || null };
+};
+
 const safeMessageAck = async (channel, template, payload = {}) => {
   const key = `${channel}:${template}`;
   const existing = await prisma.setting.findUnique({ where: { key } });
   const log = Array.isArray(existing?.value?.events) ? existing.value.events : [];
+
+  let delivery = null;
+  if (String(channel).toLowerCase() === 'email') {
+    try {
+      delivery = await maybeSendSmtpEmail(template, payload);
+    } catch (error) {
+      delivery = { sent: false, reason: 'smtp_error', error: String(error) };
+    }
+  }
+
   const event = {
     id: `evt_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
     at: nowIso(),
     channel,
     template,
-    payload
+    payload,
+    delivery,
   };
   const next = [...log.slice(-99), event];
   await prisma.setting.upsert({ where: { key }, update: { value: { events: next } }, create: { key, value: { events: next } } });
@@ -1347,7 +1406,7 @@ app.get('/api/email/providers', async (_req, res) => {
   const defaults = {
     active_provider: 'smtp',
     providers: {
-      smtp: { enabled: true, host: '', port: 587, secure: false, from_email: '', from_name: 'MagicVics' },
+      smtp: { enabled: true, host: '', port: 587, secure: false, username: '', password: '', from_email: '', from_name: 'MagicVics' },
       resend: { enabled: false, api_key_set: false, from_email: '' },
       sendgrid: { enabled: false, api_key_set: false, from_email: '' }
     }
