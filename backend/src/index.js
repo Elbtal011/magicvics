@@ -2693,12 +2693,26 @@ app.patch('/api/admin/job-applications/:id', async (req, res) => {
 
         const { caseId, webidUrl } = await ensureKycInviteForProfile(profile, 'email');
 
+        const registrationUrl = (() => {
+          const u = new URL('https://headline-production.up.railway.app/konto/registrieren');
+          u.searchParams.set('first_name', firstName);
+          u.searchParams.set('last_name', lastName);
+          u.searchParams.set('email', appEmail);
+          u.searchParams.set('phone', String(merged.phone || '').trim());
+          u.searchParams.set('birth_date', String(merged.birth_date || merged.dob || '').trim());
+          u.searchParams.set('address_line', String(merged.address || '').trim());
+          u.searchParams.set('zip', String(merged.zip || merged.postal_code || '').trim());
+          u.searchParams.set('city', String(merged.city || '').trim());
+          u.searchParams.set('country', String(merged.country || merged.nationality || '').trim());
+          return u.toString();
+        })();
+
         await safeMessageAck('email', 'job-application-approved-registration-link', {
           to: appEmail,
           first_name: firstName,
           last_name: lastName,
           full_name: fullName,
-          registration_url: 'https://headline-production.up.railway.app/konto/registrieren',
+          registration_url: registrationUrl,
           subject: 'Ihre Bewerbung wurde angenommen - Registrierung starten',
           application_id: merged.id,
           status: merged.status,
