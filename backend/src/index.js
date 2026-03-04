@@ -1250,6 +1250,32 @@ app.get('/api/admin/kyc-document', async (req, res) => {
   }
 });
 
+app.post('/api/admin/kyc/:workerId/approve', async (req, res) => {
+  try {
+    const workerId = req.params.workerId;
+    const profile = await findProfileByAnyId(workerId);
+    if (!profile) return res.status(404).json({ success: false, message: 'User not found' });
+
+    const updated = await prisma.profile.update({
+      where: { id: profile.id },
+      data: { kycStatus: 'approved', kycVerifiedAt: new Date() },
+    });
+
+    assignStarterTasksToProfile(updated.id, 'kyc_approved_auto').catch(() => null);
+    safeMessageAck('email', 'kyc-approved', {
+      to: updated.email,
+      email: updated.email,
+      first_name: updated.firstName || '',
+      last_name: updated.lastName || '',
+      full_name: updated.fullName || '',
+    }).catch(() => null);
+
+    return res.json({ success: true, data: { id: updated.id, kyc_status: 'approved' } });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to approve KYC', error: String(error) });
+  }
+});
+
 app.get('/api/admin/kyc/profiles-feed', async (_req, res) => {
   try {
     const users = await prisma.profile.findMany({
