@@ -924,7 +924,7 @@ app.patch('/api/admin/users/:id', async (req, res) => {
   const nextKycStatus = String(updated?.kycStatus || '').toLowerCase();
   const becameApproved = ['approved', 'verified', 'genehmigt'].includes(nextKycStatus) && !['approved', 'verified', 'genehmigt'].includes(previousKycStatus);
   if (becameApproved) {
-    await assignStarterTasksToProfile(updated.id, 'kyc_approved_auto');
+    assignStarterTasksToProfile(updated.id, 'kyc_approved_auto').catch(() => null);
     safeMessageAck('email', 'kyc-approved', {
       to: updated.email,
       email: updated.email,
@@ -1276,7 +1276,15 @@ app.get('/api/admin/kyc/profiles-feed', async (_req, res) => {
       const mappedSubStatus = ['in_review', 'uploaded', 'pending_review', 'submitted'].includes(rawSubStatus)
         ? 'submitted'
         : (rawSubStatus || 'submitted');
-      const kycStatus = sub ? mappedSubStatus : (u.kycStatus || 'pending');
+      const profileStatus = String(u.kycStatus || '').toLowerCase();
+      const normalizedProfileStatus = ['verified', 'genehmigt'].includes(profileStatus)
+        ? 'approved'
+        : ['declined', 'abgelehnt'].includes(profileStatus)
+          ? 'rejected'
+          : profileStatus;
+      const kycStatus = ['approved', 'rejected', 'in_review'].includes(normalizedProfileStatus)
+        ? normalizedProfileStatus
+        : (sub ? mappedSubStatus : (u.kycStatus || 'pending'));
       const docs = sub
         ? {
             identity_card_front: toHeadlineProxyAssetUrl(sub.kyc_documents?.identity_card_front),
