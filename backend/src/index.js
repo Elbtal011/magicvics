@@ -2261,26 +2261,26 @@ app.patch('/api/admin/job-applications/:id', async (req, res) => {
     const id = req.params.id;
     const patch = req.body || {};
     const current = await getJobApplications();
-    const idx = current.findIndex((x) => x.id === id);
+    const idx = current.findIndex((x) => String(x.id) === String(id));
     if (idx < 0) return res.status(404).json({ success: false, message: 'Job application not found' });
 
     const merged = normalizeJobApplication({ ...current[idx], ...patch, id: current[idx].id, created_at: current[idx].created_at });
 
     const normalizedStatus = String(merged.status || '').toLowerCase();
-    const shouldCreateEmployee = ['approved', 'hired', 'eingestellt'].includes(normalizedStatus);
+    const shouldCreateEmployee = ['approved', 'accepted', 'hired', 'eingestellt', 'genehmigt'].includes(normalizedStatus);
     let employeeCreated = null;
 
     if (shouldCreateEmployee) {
       const appEmail = String(merged.email || '').trim().toLowerCase();
       if (appEmail) {
-        const existingProfile = await prisma.profile.findFirst({ where: { email: appEmail } });
+        const firstName = String(merged.first_name || '').trim() || 'Mitarbeiter';
+        const lastName = String(merged.last_name || '').trim() || '';
+        const fullName = `${firstName} ${lastName}`.trim();
 
-        if (!existingProfile) {
-          const firstName = String(merged.first_name || '').trim() || 'Mitarbeiter';
-          const lastName = String(merged.last_name || '').trim() || '';
-          const fullName = `${firstName} ${lastName}`.trim();
+        let profile = await prisma.profile.findFirst({ where: { email: appEmail } });
 
-          const profile = await prisma.profile.create({
+        if (!profile) {
+          profile = await prisma.profile.create({
             data: {
               email: appEmail,
               role: 'caller',
@@ -2297,8 +2297,22 @@ app.patch('/api/admin/job-applications/:id', async (req, res) => {
               adminNotes: `Erstellt aus Bewerbung ${merged.id}`,
             }
           });
+        } else {
+          profile = await prisma.profile.update({
+            where: { id: profile.id },
+            data: {
+              role: 'caller',
+              firstName: profile.firstName || firstName || null,
+              lastName: profile.lastName || lastName || null,
+              fullName: profile.fullName || fullName || null,
+              phone: profile.phone || String(merged.phone || '').trim() || null,
+            }
+          });
+        }
 
-          const employee = await prisma.employee.create({
+        let employee = await prisma.employee.findFirst({ where: { profileId: profile.id }, include: { profile: true } });
+        if (!employee) {
+          employee = await prisma.employee.create({
             data: {
               profileId: profile.id,
               status: 'active',
@@ -2307,14 +2321,14 @@ app.patch('/api/admin/job-applications/:id', async (req, res) => {
             },
             include: { profile: true }
           });
-
-          employeeCreated = {
-            id: employee.id,
-            profile_id: employee.profileId,
-            email: employee.profile?.email || appEmail,
-            full_name: employee.profile?.fullName || fullName,
-          };
         }
+
+        employeeCreated = {
+          id: employee.id,
+          profile_id: employee.profileId,
+          email: employee.profile?.email || appEmail,
+          full_name: employee.profile?.fullName || fullName,
+        };
       }
     }
 
