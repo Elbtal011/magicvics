@@ -1209,6 +1209,15 @@ const fetchHeadlineKycSubmissions = async () => {
   }
 };
 
+const toAbsoluteHeadlineAssetUrl = (v) => {
+  const raw = String(v || '').trim();
+  if (!raw) return null;
+  if (/^https?:\/\//i.test(raw)) return raw;
+  const base = String(HEADLINE_API_BASE || '').replace(/\/$/, '');
+  if (!base) return raw;
+  return `${base}/${raw.replace(/^\/+/, '')}`;
+};
+
 app.get('/api/admin/kyc/profiles-feed', async (_req, res) => {
   try {
     const users = await prisma.profile.findMany({
@@ -1238,9 +1247,9 @@ app.get('/api/admin/kyc/profiles-feed', async (_req, res) => {
       const kycStatus = sub ? mappedSubStatus : (u.kycStatus || 'pending');
       const docs = sub
         ? {
-            identity_card_front: sub.kyc_documents?.identity_card_front || null,
-            identity_card_back: sub.kyc_documents?.identity_card_back || null,
-            selfie: sub.kyc_documents?.selfie || null,
+            identity_card_front: toAbsoluteHeadlineAssetUrl(sub.kyc_documents?.identity_card_front),
+            identity_card_back: toAbsoluteHeadlineAssetUrl(sub.kyc_documents?.identity_card_back),
+            selfie: toAbsoluteHeadlineAssetUrl(sub.kyc_documents?.selfie),
             detected_name: sub.kyc_documents?.detected_name || null,
             detected_id_number: sub.kyc_documents?.detected_id_number || null,
             detected_confidence: sub.kyc_documents?.detected_confidence || null,
