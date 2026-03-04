@@ -2395,8 +2395,8 @@ app.post('/api/public/user-task-assignments/:id/submit', async (req, res) => {
     if (!owns) return res.status(403).json({ success: false, message: 'Assignment does not belong to user' });
 
     const currentStatus = String(current.status || '').toLowerCase();
-    if (!['pending', 'open', 'accepted'].includes(currentStatus)) {
-      return res.status(400).json({ success: false, message: 'Task cannot be submitted in current status' });
+    if (currentStatus !== 'accepted') {
+      return res.status(400).json({ success: false, message: 'Task must be accepted before submit' });
     }
 
     const updated = normalizeTaskAssignment({ ...current, status: 'in_review', updated_at: nowIso() });
