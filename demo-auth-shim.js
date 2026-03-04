@@ -990,8 +990,10 @@
       if (method === 'PATCH' || method === 'PUT') {
         const body = normalizeBody(init?.body);
         const idFilter = (urlObj.searchParams.get('id') || '').toString();
-        const id = idFilter.startsWith('eq.') ? decodeURIComponent(idFilter.slice(3)) : null;
-        if (!id) return json({ message: 'Missing id filter for update' }, 400);
+        const idFromFilter = idFilter.startsWith('eq.') ? decodeURIComponent(idFilter.slice(3)) : null;
+        const idFromBody = body && typeof body === 'object' ? (body.id || body.application_id || null) : null;
+        const id = idFromFilter || idFromBody;
+        if (!id) return json({ message: 'Missing id for update' }, 400);
         const resp = await originalFetch(`${toAdmin}/${encodeURIComponent(id)}`, {
           method: 'PATCH',
           headers: { 'content-type': 'application/json' },
