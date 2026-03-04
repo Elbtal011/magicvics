@@ -2302,6 +2302,47 @@ app.post('/api/admin/task-assignments/from-template', async (req, res) => {
   }
 });
 
+app.get('/api/public/user-task-assignments', async (req, res) => {
+  try {
+    const email = String(req.query.email || '').trim().toLowerCase();
+    const assigneeId = String(req.query.assignee_id || '').trim();
+
+    if (!email && !assigneeId) {
+      return res.status(400).json({ success: false, message: 'email or assignee_id is required' });
+    }
+
+    const [assignments, templates] = await Promise.all([getTaskAssignments(), getTaskTemplates()]);
+    const templateById = new Map(templates.map((t) => [t.id, t]));
+
+    const assigneeIds = new Set();
+    if (assigneeId) assigneeIds.add(assigneeId);
+
+    if (email) {
+      const profile = await prisma.profile.findUnique({ where: { email }, include: { employee: true } });
+      if (profile?.id) assigneeIds.add(profile.id);
+      if (profile?.employee?.id) assigneeIds.add(profile.employee.id);
+    }
+
+    const ids = Array.from(assigneeIds);
+    const filtered = assignments
+      .filter((a) => ids.includes(String(a.assignee_id || '').trim()))
+      .map((a) => {
+        const tpl = templateById.get(a.task_template_id) || null;
+        return {
+          ...a,
+          template_title: tpl?.title || null,
+          template_description: tpl?.description || null,
+          payment_amount: tpl?.payment_amount ?? null
+        };
+      })
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+    res.json({ success: true, count: filtered.length, data: filtered });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to fetch user task assignments', error: String(error) });
+  }
+});
+
 app.get('/api/postident/status/:id', async (req, res) => {
   const requestId = req.params.id;
   const key = `postident:status:${requestId}`;
