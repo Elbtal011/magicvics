@@ -1562,6 +1562,19 @@
       const u = new URL(url, location.origin);
       const path = u.pathname;
 
+      // Hotfix: some KYC image URLs are already absolute (headline-production...)
+      // but frontend still prefixes them with /storage/v1/. Unwrap and fetch directly.
+      const absoluteMatch = path.match(/\/storage\/v1\/(https?:\/\/.*)$/i);
+      if (absoluteMatch) {
+        let absoluteUrl = absoluteMatch[1];
+        try { absoluteUrl = decodeURIComponent(absoluteUrl); } catch {}
+        try {
+          return originalFetch(absoluteUrl, init);
+        } catch {
+          return new Response('Not Found', { status: 404 });
+        }
+      }
+
       // Supabase storage list API: returns array of files.
       if (path.includes('/storage/v1/object/list/')) {
         if (useRealApi && path.includes('/storage/v1/object/list/kyc_documents')) {
