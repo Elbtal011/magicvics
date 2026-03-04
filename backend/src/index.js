@@ -2135,7 +2135,15 @@ async function assignStarterTasksToProfile(profileId, createdBy = 'job_applicati
   if (!assigneeId) return { assigned_count: 0, assignment_ids: [] };
 
   const [templates, currentAssignments] = await Promise.all([getTaskTemplates(), getTaskAssignments()]);
-  const starterTemplates = templates.filter((t) => Boolean(t.is_starter_job));
+  const starterTemplates = templates
+    .filter((t) => Boolean(t.is_starter_job))
+    .sort((a, b) => {
+      const ao = Number.isFinite(Number(a.order_number)) ? Number(a.order_number) : Number.MAX_SAFE_INTEGER;
+      const bo = Number.isFinite(Number(b.order_number)) ? Number(b.order_number) : Number.MAX_SAFE_INTEGER;
+      if (ao !== bo) return ao - bo;
+      return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
+    })
+    .slice(0, 3);
   if (starterTemplates.length === 0) return { assigned_count: 0, assignment_ids: [] };
 
   const nextAssignments = [...currentAssignments];
@@ -2926,6 +2934,7 @@ app.use((_req, res) => {
 app.listen(port, () => {
   console.log(`magicvics backend running at http://localhost:${port}`);
 });
+
 
 
 
