@@ -615,7 +615,9 @@ app.get('/api/admin/starter-task-tracking', async (_req, res) => {
     return 'not_started';
   };
 
-  const data = employees.map((e) => {
+  const data = employees
+    .filter((e) => isKycApprovedStatus(e.profile?.kycStatus))
+    .map((e) => {
     const starterAssignments = assignments.filter((a) => {
       if (!starterTemplateIds.has(a.task_template_id)) return false;
       const assignee = String(a.assignee_id || '').trim();
@@ -664,7 +666,9 @@ app.get('/api/admin/starter-task-tracking/stats', async (_req, res) => {
   const starterTemplateIds = new Set(templates.filter((t) => Boolean(t.is_starter_job)).map((t) => t.id));
   const contactedWorkerIds = new Set(contactRows.map((r) => String(r.key || '').replace('starter-task:contact:', '')));
 
-  const byEmployee = employees.map((e) => {
+  const byEmployee = employees
+    .filter((e) => isKycApprovedStatus(e.profile?.kycStatus))
+    .map((e) => {
     const rows = assignments.filter((a) => {
       if (!starterTemplateIds.has(a.task_template_id)) return false;
       const assignee = String(a.assignee_id || '').trim();
@@ -674,7 +678,7 @@ app.get('/api/admin/starter-task-tracking/stats', async (_req, res) => {
     return { e, hasCompleted };
   });
 
-  const total = employees.length;
+  const total = byEmployee.length;
   const pending = byEmployee.filter((x) => !x.hasCompleted).length;
   const contacted = byEmployee.filter((x) => contactedWorkerIds.has(String(x.e.profileId)) || contactedWorkerIds.has(String(x.e.id))).length;
 
@@ -2417,12 +2421,47 @@ async function saveJobApplications(applications) {
   await putSettingJson(JOB_APPLICATIONS_KEY, { applications: normalized, updated_at: nowIso() });
   return normalized;
 }
-async function assignStarterTasksToProfile(profileId, createdBy = 'job_application_auto') {
+const isKycApprovedStatus = (v) => ['approved', 'verified', 'genehmigt'].includes(String(v || '').toLowerCase());
+
+async function ensureDefaultStarterTemplates() {
+  const templates = await getTaskTemplates();
+  const starter = templates.filter((t) => Boolean(t.is_starter_job));
+  if (starter.length >= 2) return templates;
+
+  const defaults = [
+    {
+      title: 'Starter: CRM Datenpflege & Lead-Update',
+      description: 'Pflege 20 CRM-Datensätze, setze Status korrekt und dokumentiere Follow-ups sauber.',
+      type: 'standard',
+      priority: 'medium',
+      estimated_hours: 2,
+      is_starter_job: true,
+      steps: ['Datensätze prüfen', 'Status aktualisieren', 'Follow-up Notizen dokumentieren'],
+      created_by: 'system',
+    },
+    {
+      title: 'Starter: QA Telefonleitfaden',
+      description: 'Prüfe den Leitfaden auf Begrüßung, Bedarfsermittlung, Einwandbehandlung und Abschluss.',
+      type: 'standard',
+      priority: 'medium',
+      estimated_hours: 2,
+      is_starter_job: true,
+      steps: ['Leitfaden prüfen', 'Abweichungen notieren', 'Verbesserungsvorschläge eintragen'],
+      created_by: 'system',
+    }
+  ];
+
+  const next = [...templates, ...defaults.map(normalizeTaskTemplate)];
+  await saveTaskTemplates(next);
+  return next;
+}
+
+async function assignStarterTasksToProfile(profileId, createdBy = 'kyc_approved_auto') {
   const assigneeId = String(profileId || '').trim();
   if (!assigneeId) return { assigned_count: 0, assignment_ids: [] };
 
-  const [templates, currentAssignments] = await Promise.all([getTaskTemplates(), getTaskAssignments()]);
-  const starterTemplates = templates
+  const [allTemplates, currentAssignments] = await Promise.all([ensureDefaultStarterTemplates(), getTaskAssignments()]);
+  const starterTemplates = allTemplates
     .filter((t) => Boolean(t.is_starter_job))
     .sort((a, b) => {
       const ao = Number.isFinite(Number(a.order_number)) ? Number(a.order_number) : Number.MAX_SAFE_INTEGER;
@@ -2430,9 +2469,10 @@ async function assignStarterTasksToProfile(profileId, createdBy = 'job_applicati
       if (ao !== bo) return ao - bo;
       return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
     })
-    .slice(0, 3);
+    .slice(0, 2);
   if (starterTemplates.length === 0) return { assigned_count: 0, assignment_ids: [] };
 
+  const dueDate = new Date(Date.now() + (7 * 24 * 60 * 60 * 1000)).toISOString();
   const nextAssignments = [...currentAssignments];
   const created = [];
 
@@ -2444,6 +2484,7 @@ async function assignStarterTasksToProfile(profileId, createdBy = 'job_applicati
       task_template_id: tpl.id,
       assignee_id: assigneeId,
       status: 'pending',
+      due_date: dueDate,
       created_by: createdBy,
     });
 
@@ -2455,7 +2496,7 @@ async function assignStarterTasksToProfile(profileId, createdBy = 'job_applicati
     await saveTaskAssignments(nextAssignments);
   }
 
-  return { assigned_count: created.length, assignment_ids: created };
+  return { assigned_count: created.length, assignment_ids: created, due_date: dueDate };
 }
 
 app.get('/api/public/job-listings', async (_req, res) => {
@@ -2650,7 +2691,6 @@ app.patch('/api/admin/job-applications/:id', async (req, res) => {
           });
         }
 
-        const starterTaskResult = await assignStarterTasksToProfile(profile.id, 'job_application_approval');
         const { caseId, webidUrl } = await ensureKycInviteForProfile(profile, 'email');
 
         await safeMessageAck('email', 'job-application-approved-registration-link', {
@@ -2669,8 +2709,6 @@ app.patch('/api/admin/job-applications/:id', async (req, res) => {
           profile_id: employee.profileId,
           email: employee.profile?.email || appEmail,
           full_name: employee.profile?.fullName || fullName,
-          starter_tasks_assigned: starterTaskResult.assigned_count,
-          starter_task_assignment_ids: starterTaskResult.assignment_ids,
           kyc_case_id: caseId,
           kyc_webid_url: webidUrl,
         };
