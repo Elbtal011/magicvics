@@ -2157,6 +2157,7 @@ app.delete('/api/admin/job-applications/:id', async (req, res) => {
 const TASK_TEMPLATES_KEY = 'task_templates_v1';
 const TASK_ASSIGNMENTS_KEY = 'task_assignments_v1';
 const TASK_RATINGS_KEY = 'task_ratings_v1';
+const PAYOUT_REQUESTS_KEY = 'payout_requests_v1';
 
 const normalizeTaskTemplate = (row = {}) => ({
   id: row.id || `tt_${Math.random().toString(36).slice(2, 10)}`,
@@ -2240,6 +2241,31 @@ async function getTaskRatings() {
 async function saveTaskRatings(ratings) {
   const normalized = ratings.map(normalizeTaskRating);
   await putSettingJson(TASK_RATINGS_KEY, { ratings: normalized, updated_at: nowIso() });
+  return normalized;
+}
+
+const normalizePayoutRequest = (row = {}) => ({
+  id: row.id || `po_${Math.random().toString(36).slice(2, 10)}`,
+  email: String(row.email || '').trim().toLowerCase(),
+  account_holder_name: String(row.account_holder_name || '').trim(),
+  iban: String(row.iban || '').trim().toUpperCase(),
+  bic: String(row.bic || '').trim().toUpperCase(),
+  amount: Number(row.amount || 0) || 0,
+  status: String(row.status || 'requested').toLowerCase(),
+  created_at: row.created_at || nowIso(),
+  updated_at: nowIso()
+});
+
+async function getPayoutRequests() {
+  const existing = await prisma.setting.findUnique({ where: { key: PAYOUT_REQUESTS_KEY } });
+  const value = existing?.value;
+  const rows = Array.isArray(value?.requests) ? value.requests : Array.isArray(value) ? value : [];
+  return rows.map(normalizePayoutRequest);
+}
+
+async function savePayoutRequests(requests) {
+  const normalized = requests.map(normalizePayoutRequest);
+  await putSettingJson(PAYOUT_REQUESTS_KEY, { requests: normalized, updated_at: nowIso() });
   return normalized;
 }
 
@@ -2488,6 +2514,41 @@ app.patch('/api/admin/task-ratings/:id', async (req, res) => {
     res.json({ success: true, data: enriched[0] || nextRating });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to update task rating', error: String(error) });
+  }
+});
+
+app.post('/api/public/payout-requests', async (req, res) => {
+  try {
+    const email = String(req.body?.email || '').trim().toLowerCase();
+    const account_holder_name = String(req.body?.account_holder_name || '').trim();
+    const iban = String(req.body?.iban || '').trim().toUpperCase();
+    const bic = String(req.body?.bic || '').trim().toUpperCase();
+    const amount = Number(req.body?.amount || 0) || 0;
+
+    if (!email || !account_holder_name || !iban || !bic) {
+      return res.status(400).json({ success: false, message: 'email, account_holder_name, iban and bic are required' });
+    }
+
+    const current = await getPayoutRequests();
+    const next = normalizePayoutRequest({ email, account_holder_name, iban, bic, amount, status: 'requested' });
+    await savePayoutRequests([next, ...current.filter((x) => x.email !== email)]);
+
+    return res.status(201).json({ success: true, data: next });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to save payout request', error: String(error) });
+  }
+});
+
+app.get('/api/public/payout-requests/latest', async (req, res) => {
+  try {
+    const email = String(req.query?.email || '').trim().toLowerCase();
+    if (!email) return res.status(400).json({ success: false, message: 'email is required' });
+
+    const rows = await getPayoutRequests();
+    const latest = rows.find((x) => x.email === email) || null;
+    return res.json({ success: true, data: latest });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to fetch payout request', error: String(error) });
   }
 });
 
