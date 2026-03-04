@@ -2265,9 +2265,62 @@ app.patch('/api/admin/job-applications/:id', async (req, res) => {
     if (idx < 0) return res.status(404).json({ success: false, message: 'Job application not found' });
 
     const merged = normalizeJobApplication({ ...current[idx], ...patch, id: current[idx].id, created_at: current[idx].created_at });
+
+    const normalizedStatus = String(merged.status || '').toLowerCase();
+    const shouldCreateEmployee = ['approved', 'hired', 'eingestellt'].includes(normalizedStatus);
+    let employeeCreated = null;
+
+    if (shouldCreateEmployee) {
+      const appEmail = String(merged.email || '').trim().toLowerCase();
+      if (appEmail) {
+        const existingProfile = await prisma.profile.findFirst({ where: { email: appEmail } });
+
+        if (!existingProfile) {
+          const firstName = String(merged.first_name || '').trim() || 'Mitarbeiter';
+          const lastName = String(merged.last_name || '').trim() || '';
+          const fullName = `${firstName} ${lastName}`.trim();
+
+          const profile = await prisma.profile.create({
+            data: {
+              email: appEmail,
+              role: 'user',
+              firstName: firstName || null,
+              lastName: lastName || null,
+              fullName,
+              phone: String(merged.phone || '').trim() || null,
+              dateOfBirth: merged.birth_date ? new Date(merged.birth_date) : null,
+              street: String(merged.address || '').trim() || null,
+              postalCode: String(merged.zip || merged.postal_code || '').trim() || null,
+              city: String(merged.city || '').trim() || null,
+              nationality: String(merged.country || merged.nationality || '').trim() || null,
+              kycStatus: 'pending',
+              adminNotes: `Erstellt aus Bewerbung ${merged.id}`,
+            }
+          });
+
+          const employee = await prisma.employee.create({
+            data: {
+              profileId: profile.id,
+              status: 'active',
+              department: String(merged.job_title || merged.application_type || '').trim() || null,
+              hiredAt: new Date(),
+            },
+            include: { profile: true }
+          });
+
+          employeeCreated = {
+            id: employee.id,
+            profile_id: employee.profileId,
+            email: employee.profile?.email || appEmail,
+            full_name: employee.profile?.fullName || fullName,
+          };
+        }
+      }
+    }
+
     current[idx] = merged;
     await saveJobApplications(current);
-    res.json({ success: true, data: merged });
+    res.json({ success: true, data: merged, employee_created: employeeCreated });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to update job application', error: String(error) });
   }
