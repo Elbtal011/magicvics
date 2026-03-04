@@ -1365,7 +1365,7 @@
             const payload = await resp.json().catch(() => ({}));
             const users = Array.isArray(payload?.users) ? payload.users : [];
             return users
-              .filter((u) => String(u.role || '').toLowerCase() === 'user')
+              .filter((u) => ['user', 'caller'].includes(String(u.role || '').toLowerCase()))
               .map((u) => ({
                 id: u.id,
                 first_name: u.first_name || u.user_metadata?.first_name || '',
@@ -1402,7 +1402,7 @@
             const payload = await resp.json().catch(() => ({}));
             const users = Array.isArray(payload?.users) ? payload.users : [];
             const combined = users
-              .filter((u) => String(u.role || '').toLowerCase() === 'user')
+              .filter((u) => ['user', 'caller'].includes(String(u.role || '').toLowerCase()))
               .map((u) => ({
                 id: u.id,
                 first_name: u.first_name || u.user_metadata?.first_name || '',
