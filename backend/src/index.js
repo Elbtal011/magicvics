@@ -2332,6 +2332,8 @@ app.get('/api/public/user-task-assignments', async (req, res) => {
           ...a,
           template_title: tpl?.title || null,
           template_description: tpl?.description || null,
+          template_steps: Array.isArray(tpl?.steps) ? tpl.steps : [],
+          template_required_attachments: Array.isArray(tpl?.required_attachments) ? tpl.required_attachments : [],
           payment_amount: tpl?.payment_amount ?? null
         };
       })
@@ -2340,6 +2342,48 @@ app.get('/api/public/user-task-assignments', async (req, res) => {
     res.json({ success: true, count: filtered.length, data: filtered });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to fetch user task assignments', error: String(error) });
+  }
+});
+
+app.post('/api/public/user-task-assignments/:id/submit', async (req, res) => {
+  try {
+    const assignmentId = String(req.params.id || '').trim();
+    const email = String(req.body?.email || req.query?.email || '').trim().toLowerCase();
+
+    if (!assignmentId) return res.status(400).json({ success: false, message: 'assignment id is required' });
+
+    const [assignments, templates] = await Promise.all([getTaskAssignments(), getTaskTemplates()]);
+    const idx = assignments.findIndex((a) => a.id === assignmentId);
+    if (idx < 0) return res.status(404).json({ success: false, message: 'Task assignment not found' });
+
+    const current = assignments[idx];
+
+    if (email) {
+      const profile = await prisma.profile.findUnique({ where: { email }, include: { employee: true } });
+      const ownerIds = new Set([profile?.id, profile?.employee?.id].filter(Boolean));
+      if (!ownerIds.has(current.assignee_id)) {
+        return res.status(403).json({ success: false, message: 'Assignment does not belong to user' });
+      }
+    }
+
+    const nextStatus = current.status === 'completed' ? 'completed' : 'in_review';
+    const updated = normalizeTaskAssignment({ ...current, status: nextStatus, updated_at: nowIso() });
+    assignments[idx] = updated;
+    await saveTaskAssignments(assignments);
+
+    const tpl = templates.find((t) => t.id === updated.task_template_id) || null;
+
+    res.json({
+      success: true,
+      data: {
+        ...updated,
+        template_title: tpl?.title || null,
+        template_description: tpl?.description || null,
+        payment_amount: tpl?.payment_amount ?? null
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to submit task assignment', error: String(error) });
   }
 });
 
