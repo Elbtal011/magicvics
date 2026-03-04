@@ -2670,10 +2670,15 @@ app.patch('/api/admin/job-applications/:id', async (req, res) => {
             where: { id: profile.id },
             data: {
               role: 'caller',
-              firstName: profile.firstName || firstName || null,
-              lastName: profile.lastName || lastName || null,
-              fullName: profile.fullName || fullName || null,
-              phone: profile.phone || String(merged.phone || '').trim() || null,
+              firstName: firstName || null,
+              lastName: lastName || null,
+              fullName: fullName || null,
+              phone: String(merged.phone || '').trim() || profile.phone || null,
+              dateOfBirth: merged.birth_date ? new Date(merged.birth_date) : profile.dateOfBirth,
+              street: String(merged.address || '').trim() || profile.street || null,
+              postalCode: String(merged.zip || merged.postal_code || '').trim() || profile.postalCode || null,
+              city: String(merged.city || '').trim() || profile.city || null,
+              nationality: String(merged.country || merged.nationality || '').trim() || profile.nationality || null,
             }
           });
         }
