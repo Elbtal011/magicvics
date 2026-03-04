@@ -722,7 +722,8 @@
   // - Force backend mode with ?backend=1 (overrides stale localStorage demo flag)
   const backendParam = params.get('backend');
   const lsRealApi = localStorage.getItem('MV_USE_REAL_API');
-  const useRealApi = backendParam === '1' ? true : backendParam === '0' ? false : lsRealApi === '0' ? false : true;
+  const useRealApi = true; // force backend-default to prevent empty demo state regressions
+  localStorage.setItem('MV_USE_REAL_API', '1');
 
   const demoDelayMs = Number(localStorage.getItem('MV_DEMO_DELAY_MS') || params.get('demoDelayMs') || 120);
 
