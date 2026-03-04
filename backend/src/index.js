@@ -2283,7 +2283,7 @@ app.patch('/api/admin/job-applications/:id', async (req, res) => {
           const profile = await prisma.profile.create({
             data: {
               email: appEmail,
-              role: 'user',
+              role: 'caller',
               firstName: firstName || null,
               lastName: lastName || null,
               fullName,
