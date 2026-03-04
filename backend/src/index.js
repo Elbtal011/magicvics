@@ -1,4 +1,4 @@
-﻿import express from 'express';
+import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
@@ -35,7 +35,7 @@ const OPENAI_API_KEY = String(process.env.OPENAI_API_KEY || '').trim();
 const OPENAI_MODEL = String(process.env.OPENAI_MODEL || 'gpt-4o-mini').trim();
 const CHAT_BRAND_NAME = String(process.env.CHAT_BRAND_NAME || 'Headline Agentur').trim();
 
-const defaultChatReply = (content) => `Danke fÃ¼r deine Nachricht: "${String(content || '').slice(0, 120)}". Ein Admin kann jederzeit eingreifen.`;
+const defaultChatReply = (content) => `Danke für deine Nachricht: "${String(content || '').slice(0, 120)}". Ein Admin kann jederzeit eingreifen.`;
 
 const DEFAULT_KNOWLEDGE_ARTICLES = [
   {
@@ -45,8 +45,8 @@ const DEFAULT_KNOWLEDGE_ARTICLES = [
   },
   {
     id: 'kba-2',
-    title: 'KYC: Dokumente und hÃ¤ufige Fehler',
-    content: 'Welche Dokumente akzeptiert werden und was oft zu Ablehnungen fÃ¼hrt.'
+    title: 'KYC: Dokumente und häufige Fehler',
+    content: 'Welche Dokumente akzeptiert werden und was oft zu Ablehnungen führt.'
   },
   {
     id: 'kba-3',
@@ -97,7 +97,7 @@ async function generateOpenAIReply({ content, history = [], snippets = [] }) {
     {
       role: 'system',
       content:
-        `Du bist der Karriere- und Support-Assistent von ${CHAT_BRAND_NAME}. Antworte kurz, hilfreich und auf Deutsch. Wenn Informationen fehlen, stelle eine kurze RÃ¼ckfrage. Erfinde keine Fakten.` +
+        `Du bist der Karriere- und Support-Assistent von ${CHAT_BRAND_NAME}. Antworte kurz, hilfreich und auf Deutsch. Wenn Informationen fehlen, stelle eine kurze Rückfrage. Erfinde keine Fakten.` +
         kbBlock
     },
     ...history,
@@ -1131,7 +1131,7 @@ app.get('/api/phone/services', (req, res) => {
       },
       countries: {
         '98': { name: 'Deutschland' },
-        '286': { name: 'Vereinigtes KÃ¶nigreich' },
+        '286': { name: 'Vereinigtes Königreich' },
         '67': { name: 'Tschechische Republik' },
         '165': { name: 'Litauen' },
         '196': { name: 'Niederlande' }
@@ -1492,7 +1492,7 @@ const loadChatState = async () => {
         conversation_id: conv.id,
         sender_type: 'ai',
         sender_id: null,
-        content: 'NatÃ¼rlich, ich helfe dir gerne. Worum geht es genau?',
+        content: 'Natürlich, ich helfe dir gerne. Worum geht es genau?',
         message_type: 'text',
         metadata: {},
         deleted_at: null,
@@ -2130,6 +2130,38 @@ async function saveJobApplications(applications) {
   await putSettingJson(JOB_APPLICATIONS_KEY, { applications: normalized, updated_at: nowIso() });
   return normalized;
 }
+async function assignStarterTasksToProfile(profileId, createdBy = 'job_application_auto') {
+  const assigneeId = String(profileId || '').trim();
+  if (!assigneeId) return { assigned_count: 0, assignment_ids: [] };
+
+  const [templates, currentAssignments] = await Promise.all([getTaskTemplates(), getTaskAssignments()]);
+  const starterTemplates = templates.filter((t) => Boolean(t.is_starter_job));
+  if (starterTemplates.length === 0) return { assigned_count: 0, assignment_ids: [] };
+
+  const nextAssignments = [...currentAssignments];
+  const created = [];
+
+  for (const tpl of starterTemplates) {
+    const exists = nextAssignments.some((a) => a.task_template_id === tpl.id && String(a.assignee_id || '') === assigneeId);
+    if (exists) continue;
+
+    const row = normalizeTaskAssignment({
+      task_template_id: tpl.id,
+      assignee_id: assigneeId,
+      status: 'pending',
+      created_by: createdBy,
+    });
+
+    nextAssignments.unshift(row);
+    created.push(row.id);
+  }
+
+  if (created.length > 0) {
+    await saveTaskAssignments(nextAssignments);
+  }
+
+  return { assigned_count: created.length, assignment_ids: created };
+}
 
 app.get('/api/public/job-listings', async (_req, res) => {
   try {
@@ -2323,11 +2355,26 @@ app.patch('/api/admin/job-applications/:id', async (req, res) => {
           });
         }
 
+        const starterTaskResult = await assignStarterTasksToProfile(profile.id, 'job_application_approval');
+
+        await safeMessageAck('email', 'job-application-approved-registration-link', {
+          to: appEmail,
+          first_name: firstName,
+          last_name: lastName,
+          full_name: fullName,
+          registration_url: 'https://headline-production.up.railway.app/konto/registrieren',
+          subject: 'Ihre Bewerbung wurde angenommen � Registrierung starten',
+          application_id: merged.id,
+          status: merged.status,
+        });
+
         employeeCreated = {
           id: employee.id,
           profile_id: employee.profileId,
           email: employee.profile?.email || appEmail,
           full_name: employee.profile?.fullName || fullName,
+          starter_tasks_assigned: starterTaskResult.assigned_count,
+          starter_task_assignment_ids: starterTaskResult.assignment_ids,
         };
       }
     }
@@ -2879,4 +2926,6 @@ app.use((_req, res) => {
 app.listen(port, () => {
   console.log(`magicvics backend running at http://localhost:${port}`);
 });
+
+
 
