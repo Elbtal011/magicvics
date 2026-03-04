@@ -1175,9 +1175,7 @@
       }
 
       return json({ message: `Unsupported method ${method} for bridged table ${table}` }, 405);
-    }
-
-    if (useRealApi && table === 'profiles' && (method === 'GET' || method === 'HEAD')) {
+    }    if (useRealApi && table === 'profiles' && (method === 'GET' || method === 'HEAD')) {
       try {
         const resp = await originalFetch('/api/admin/kyc-submissions', { method: 'GET', headers: init?.headers });
         if (resp.ok) {
@@ -1196,25 +1194,30 @@
             created_at: r.created_at || isoNow(),
             updated_at: r.updated_at || isoNow()
           }));
+
           const admins = (store.get('profiles') || []).filter((x) => String(x.role || '').toLowerCase() === 'admin');
           store.set('profiles', [...admins, ...bridged]);
 
           const filteredRows = applyQuery(bridged, urlObj.searchParams);
           if (method === 'HEAD') {
             const totalCount = filteredRows.length;
-            return new Response('', { status: 200, headers: { 'content-range':  -/ } });
+            return new Response('', {
+              status: 200,
+              headers: { 'content-range': '0-' + Math.max(0, totalCount - 1) + '/' + totalCount }
+            });
           }
 
           const accept = (asHeaders(init?.headers).get('accept') || '').toLowerCase();
           const wantsSingle = accept.includes('vnd.pgrst.object+json');
           if (wantsSingle) return filteredRows[0] ? json(filteredRows[0]) : json({ message: 'No rows' }, 406);
           const totalCount = filteredRows.length;
-          return json(filteredRows, 200, { 'content-range':  -/ });
+          return json(filteredRows, 200, { 'content-range': '0-' + Math.max(0, totalCount - 1) + '/' + totalCount });
         }
       } catch (_err) {
         // fall through to local store
       }
     }
+
     const rows = store.get(table) || [];
     const select = urlObj.searchParams.get('select');
     const filtered = applyQuery(rows, urlObj.searchParams);
@@ -1567,7 +1570,7 @@
           const pushFile = (docType, relPath) => {
             if (!relPath) return;
             const name = String(relPath).split('/').pop();
-            files.push({ name: ${docType}_, metadata: { size: 0 }, created_at: profile?.created_at || isoNow() });
+            files.push({ name: docType + '_' + name, metadata: { size: 0 }, created_at: profile?.created_at || isoNow() });
           };
           pushFile('identity_card_front', docs.identity_card_front);
           pushFile('identity_card_back', docs.identity_card_back);
@@ -1584,6 +1587,9 @@
           const parts = key.split('/');
           const folder = parts[0] || '';
           const fileName = parts.slice(1).join('/');
+          const profiles = store.get('profiles') || [];
+          const profile = profiles.find((p) => String(p.id) === folder);
+          const docs = profile?.kyc_documents || {};
           const relPath = fileName.startsWith('identity_card_back_') ? docs.identity_card_back : fileName.startsWith('identity_card_front_') ? docs.identity_card_front : fileName.startsWith('selfie_') ? docs.selfie : null;
           if (relPath) return json({ signedURL: '/' + String(relPath).replace(/^\/+/, '') });
         }
@@ -1994,6 +2000,7 @@
 
   console.info(`[demo-auth-shim] enabled (${useRealApi ? 'backend-default' : 'demo-forced'})`);
 })();
+
 
 
 
