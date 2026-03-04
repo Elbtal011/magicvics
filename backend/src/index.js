@@ -1,4 +1,4 @@
-import express from 'express';
+﻿import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
@@ -35,7 +35,7 @@ const OPENAI_API_KEY = String(process.env.OPENAI_API_KEY || '').trim();
 const OPENAI_MODEL = String(process.env.OPENAI_MODEL || 'gpt-4o-mini').trim();
 const CHAT_BRAND_NAME = String(process.env.CHAT_BRAND_NAME || 'Headline Agentur').trim();
 
-const defaultChatReply = (content) => `Danke für deine Nachricht: "${String(content || '').slice(0, 120)}". Ein Admin kann jederzeit eingreifen.`;
+const defaultChatReply = (content) => `Danke fÃ¼r deine Nachricht: "${String(content || '').slice(0, 120)}". Ein Admin kann jederzeit eingreifen.`;
 
 const DEFAULT_KNOWLEDGE_ARTICLES = [
   {
@@ -45,8 +45,8 @@ const DEFAULT_KNOWLEDGE_ARTICLES = [
   },
   {
     id: 'kba-2',
-    title: 'KYC: Dokumente und häufige Fehler',
-    content: 'Welche Dokumente akzeptiert werden und was oft zu Ablehnungen führt.'
+    title: 'KYC: Dokumente und hÃ¤ufige Fehler',
+    content: 'Welche Dokumente akzeptiert werden und was oft zu Ablehnungen fÃ¼hrt.'
   },
   {
     id: 'kba-3',
@@ -97,7 +97,7 @@ async function generateOpenAIReply({ content, history = [], snippets = [] }) {
     {
       role: 'system',
       content:
-        `Du bist der Karriere- und Support-Assistent von ${CHAT_BRAND_NAME}. Antworte kurz, hilfreich und auf Deutsch. Wenn Informationen fehlen, stelle eine kurze Rückfrage. Erfinde keine Fakten.` +
+        `Du bist der Karriere- und Support-Assistent von ${CHAT_BRAND_NAME}. Antworte kurz, hilfreich und auf Deutsch. Wenn Informationen fehlen, stelle eine kurze RÃ¼ckfrage. Erfinde keine Fakten.` +
         kbBlock
     },
     ...history,
@@ -905,6 +905,138 @@ const safeMessageAck = async (channel, template, payload = {}) => {
   return event;
 };
 
+const generateWebIdCaseId = () => {
+  const seg = () => String(Math.floor(100 + Math.random() * 900));
+  return `${seg()}-${seg()}-${seg()}`;
+};
+
+const normalizeCaseId = (v) => String(v || '').trim().replace(/[^0-9-]/g, '').slice(0, 40);
+
+const HEADLINE_WEBID_BASE = String(process.env.HEADLINE_WEBID_BASE || 'https://headline-production.up.railway.app').replace(/\/$/, '');
+const HEADLINE_API_BASE = String(process.env.HEADLINE_API_BASE || HEADLINE_WEBID_BASE).replace(/\/$/, '');
+
+const getKycInvites = async () => {
+  const row = await loadJsonSetting('kyc:webid:invites', { invites: [] });
+  const invites = Array.isArray(row?.invites) ? row.invites : [];
+  return invites;
+};
+
+const setKycInvites = async (invites) => {
+  await saveJsonSetting('kyc:webid:invites', { invites });
+};
+
+const fetchHeadlineKycSubmissions = async () => {
+  if (!HEADLINE_API_BASE) return [];
+  try {
+    const resp = await fetch(`${HEADLINE_API_BASE}/api/admin/kyc-submissions`, { method: 'GET' });
+    if (!resp.ok) return [];
+    const payload = await resp.json().catch(() => ({}));
+    return Array.isArray(payload?.data) ? payload.data : [];
+  } catch {
+    return [];
+  }
+};
+
+app.get('/api/admin/kyc/profiles-feed', async (_req, res) => {
+  try {
+    const users = await prisma.profile.findMany({
+      where: { role: 'user' },
+      orderBy: { updatedAt: 'desc' }
+    });
+
+    const invites = await getKycInvites();
+    const submissions = await fetchHeadlineKycSubmissions();
+    const subByCase = new Map(submissions.map((s) => [normalizeCaseId(s.case_id), s]));
+
+    const data = users.map((u) => {
+      const inv = invites.find((x) => String(x.profileId) === String(u.id));
+      const sub = inv ? subByCase.get(normalizeCaseId(inv.caseId)) : null;
+
+      const kycStatus = sub ? (sub.kyc_status || 'in_review') : (u.kycStatus || 'pending');
+      const docs = sub
+        ? {
+            identity_card_front: sub.kyc_documents?.identity_card_front || null,
+            identity_card_back: sub.kyc_documents?.identity_card_back || null,
+            selfie: sub.kyc_documents?.selfie || null,
+            detected_name: sub.kyc_documents?.detected_name || null,
+            detected_id_number: sub.kyc_documents?.detected_id_number || null,
+            detected_confidence: sub.kyc_documents?.detected_confidence || null,
+            case_id: inv?.caseId || sub.id || null,
+          }
+        : (u.kycDocuments || null);
+
+      return {
+        id: u.id,
+        first_name: u.firstName || '',
+        last_name: u.lastName || '',
+        email: u.email || '',
+        phone: u.phone || null,
+        role: 'user',
+        kyc_status: kycStatus,
+        kyc_documents: docs,
+        kyc_verified_at: u.kycVerifiedAt || null,
+        updated_at: sub?.updated_at || inv?.updatedAt || u.updatedAt,
+        created_at: u.createdAt,
+      };
+    });
+
+    return res.json({ success: true, data });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: String(error) });
+  }
+});
+
+app.post('/api/admin/kyc/:workerId/send-reminder', async (req, res) => {
+  try {
+    const workerId = req.params.workerId;
+    const type = req.body?.type || 'email';
+
+    const profile = await findProfileByAnyId(workerId);
+    if (!profile) return res.status(404).json({ success: false, message: 'User not found' });
+
+    const invites = await getKycInvites();
+    const existingIdx = invites.findIndex((x) => String(x.profileId) === String(profile.id));
+    const caseId = existingIdx >= 0 ? invites[existingIdx].caseId : generateWebIdCaseId();
+    const webidUrl = `${HEADLINE_WEBID_BASE}/webid/${encodeURIComponent(caseId)}`;
+
+    const entry = {
+      profileId: profile.id,
+      email: profile.email,
+      caseId,
+      webidUrl,
+      type,
+      status: 'sent',
+      updatedAt: nowIso(),
+      sentAt: nowIso(),
+    };
+
+    if (existingIdx >= 0) invites[existingIdx] = { ...invites[existingIdx], ...entry };
+    else invites.unshift(entry);
+    await setKycInvites(invites.slice(0, 1000));
+
+    const event = await safeMessageAck('kyc-reminder', type, {
+      profile_id: profile.id,
+      email: profile.email,
+      case_id: caseId,
+      webid_url: webidUrl,
+      admin_id: req.body?.adminId || null,
+    });
+
+    return res.json({
+      success: true,
+      message: 'KYC-Link erstellt und Erinnerung registriert.',
+      data: {
+        emailSent: type === 'email' || type === 'both',
+        smsSent: type === 'sms' || type === 'both',
+        webidUrl,
+        caseId,
+        event_id: event.id,
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to send reminder', error: String(error) });
+  }
+});
 app.post('/api/email/:template', async (req, res) => {
   const event = await safeMessageAck('email', req.params.template, req.body || {});
   res.json({ success: true, status: 'queued', channel: 'email', template: req.params.template, event_id: event.id, simulated: true });
@@ -999,7 +1131,7 @@ app.get('/api/phone/services', (req, res) => {
       },
       countries: {
         '98': { name: 'Deutschland' },
-        '286': { name: 'Vereinigtes Königreich' },
+        '286': { name: 'Vereinigtes KÃ¶nigreich' },
         '67': { name: 'Tschechische Republik' },
         '165': { name: 'Litauen' },
         '196': { name: 'Niederlande' }
@@ -1360,7 +1492,7 @@ const loadChatState = async () => {
         conversation_id: conv.id,
         sender_type: 'ai',
         sender_id: null,
-        content: 'Natürlich, ich helfe dir gerne. Worum geht es genau?',
+        content: 'NatÃ¼rlich, ich helfe dir gerne. Worum geht es genau?',
         message_type: 'text',
         metadata: {},
         deleted_at: null,
@@ -2680,3 +2812,4 @@ app.use((_req, res) => {
 app.listen(port, () => {
   console.log(`magicvics backend running at http://localhost:${port}`);
 });
+

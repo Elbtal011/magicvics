@@ -1177,7 +1177,7 @@
       return json({ message: `Unsupported method ${method} for bridged table ${table}` }, 405);
     }    if (useRealApi && table === 'profiles' && (method === 'GET' || method === 'HEAD')) {
       try {
-        const resp = await originalFetch('/api/admin/kyc-submissions', { method: 'GET', headers: init?.headers });
+        const resp = await originalFetch('/api/admin/kyc/profiles-feed', { method: 'GET', headers: init?.headers });
         if (resp.ok) {
           const payload = await resp.json().catch(() => ({}));
           const rows = Array.isArray(payload?.data) ? payload.data : [];
@@ -2000,6 +2000,7 @@
 
   console.info(`[demo-auth-shim] enabled (${useRealApi ? 'backend-default' : 'demo-forced'})`);
 })();
+
 
 
 
