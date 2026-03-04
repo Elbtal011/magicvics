@@ -940,7 +940,7 @@ const fetchHeadlineKycSubmissions = async () => {
 app.get('/api/admin/kyc/profiles-feed', async (_req, res) => {
   try {
     const users = await prisma.profile.findMany({
-      where: { role: 'user' },
+      where: { role: { in: ['user', 'caller'] } },
       orderBy: { updatedAt: 'desc' }
     });
 
