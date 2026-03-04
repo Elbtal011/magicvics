@@ -585,31 +585,99 @@ app.put('/api/settings/:key', async (req, res) => {
 
 // Starter-task compatibility endpoints used by current demo shim/admin pages.
 app.get('/api/admin/starter-task-tracking', async (_req, res) => {
-  const employees = await prisma.employee.findMany({ include: { profile: true }, orderBy: { createdAt: 'desc' } });
-  const data = employees.map((e) => ({
-    id: e.profileId,
-    employee_id: e.id,
-    profile_id: e.profileId,
-    // Frontend starter-task table uses worker_id for /admin/employees/:id navigation,
-    // and that details page expects profile id shape.
-    worker_id: e.profileId,
-    worker_first_name: e.profile.firstName || e.profile.fullName.split(' ')[0] || 'Unknown',
-    worker_last_name: e.profile.lastName || e.profile.fullName.split(' ').slice(1).join(' '),
-    worker_email: e.profile.email,
-    worker_phone: e.profile.phone,
-    registered_at: e.createdAt,
-    days_since_registration: Math.floor((Date.now() - new Date(e.createdAt).getTime()) / (1000 * 60 * 60 * 24)),
-    task_status: 'not_started',
-    contact_count: 0,
-    last_contact_type: null,
-    last_contacted_at: null
-  }));
+  const [employees, templates, assignments, contactRows] = await Promise.all([
+    prisma.employee.findMany({ include: { profile: true }, orderBy: { createdAt: 'desc' } }),
+    getTaskTemplates(),
+    getTaskAssignments(),
+    prisma.setting.findMany({ where: { key: { startsWith: 'starter-task:contact:' } } })
+  ]);
+
+  const starterTemplateIds = new Set(templates.filter((t) => Boolean(t.is_starter_job)).map((t) => t.id));
+  const contactByWorker = new Map();
+  for (const row of contactRows) {
+    const workerId = String(row.key || '').replace('starter-task:contact:', '');
+    const history = Array.isArray(row?.value?.history) ? row.value.history : [];
+    const last = history.length ? history[history.length - 1] : null;
+    contactByWorker.set(workerId, {
+      contact_count: history.length,
+      last_contact_type: last?.type || null,
+      last_contacted_at: last?.at || null,
+    });
+  }
+
+  const statusFromAssignments = (rows) => {
+    if (!rows.length) return 'not_started';
+    const statuses = rows.map((r) => String(r.status || '').toLowerCase());
+    if (statuses.some((x) => ['approved', 'completed', 'genehmigt'].includes(x))) return 'completed';
+    if (statuses.some((x) => ['in_review', 'submitted', 'review', 'pending_review'].includes(x))) return 'in_review';
+    if (statuses.some((x) => ['accepted', 'assigned', 'open', 'pending', 'in_progress', 'started'].includes(x))) return 'in_progress';
+    return 'not_started';
+  };
+
+  const data = employees.map((e) => {
+    const starterAssignments = assignments.filter((a) => {
+      if (!starterTemplateIds.has(a.task_template_id)) return false;
+      const assignee = String(a.assignee_id || '').trim();
+      return assignee === String(e.profileId) || assignee === String(e.id);
+    });
+
+    const contact = contactByWorker.get(String(e.profileId)) || contactByWorker.get(String(e.id)) || {
+      contact_count: 0,
+      last_contact_type: null,
+      last_contacted_at: null,
+    };
+
+    return {
+      id: e.profileId,
+      employee_id: e.id,
+      profile_id: e.profileId,
+      // Frontend starter-task table uses worker_id for /admin/employees/:id navigation,
+      // and that details page expects profile id shape.
+      worker_id: e.profileId,
+      worker_first_name: e.profile.firstName || e.profile.fullName.split(' ')[0] || 'Unknown',
+      worker_last_name: e.profile.lastName || e.profile.fullName.split(' ').slice(1).join(' '),
+      worker_email: e.profile.email,
+      worker_phone: e.profile.phone,
+      registered_at: e.createdAt,
+      days_since_registration: Math.floor((Date.now() - new Date(e.createdAt).getTime()) / (1000 * 60 * 60 * 24)),
+      task_status: statusFromAssignments(starterAssignments),
+      starter_tasks_total: starterAssignments.length,
+      starter_tasks_completed: starterAssignments.filter((a) => ['approved', 'completed', 'genehmigt'].includes(String(a.status || '').toLowerCase())).length,
+      contact_count: contact.contact_count,
+      last_contact_type: contact.last_contact_type,
+      last_contacted_at: contact.last_contacted_at,
+    };
+  });
+
   res.json({ success: true, data });
 });
 
 app.get('/api/admin/starter-task-tracking/stats', async (_req, res) => {
-  const total = await prisma.employee.count();
-  res.json({ success: true, data: { total_workers: total, pending_workers: total, contacted_workers: 0 } });
+  const [employees, templates, assignments, contactRows] = await Promise.all([
+    prisma.employee.findMany({ include: { profile: true } }),
+    getTaskTemplates(),
+    getTaskAssignments(),
+    prisma.setting.findMany({ where: { key: { startsWith: 'starter-task:contact:' } } })
+  ]);
+
+  const starterTemplateIds = new Set(templates.filter((t) => Boolean(t.is_starter_job)).map((t) => t.id));
+  const contactedWorkerIds = new Set(contactRows.map((r) => String(r.key || '').replace('starter-task:contact:', '')));
+
+  const byEmployee = employees.map((e) => {
+    const rows = assignments.filter((a) => {
+      if (!starterTemplateIds.has(a.task_template_id)) return false;
+      const assignee = String(a.assignee_id || '').trim();
+      return assignee === String(e.profileId) || assignee === String(e.id);
+    });
+    const hasCompleted = rows.some((a) => ['approved', 'completed', 'genehmigt'].includes(String(a.status || '').toLowerCase()));
+    return { e, hasCompleted };
+  });
+
+  const total = employees.length;
+  const pending = byEmployee.filter((x) => !x.hasCompleted).length;
+  const contacted = byEmployee.filter((x) => contactedWorkerIds.has(String(x.e.profileId)) || contactedWorkerIds.has(String(x.e.id))).length;
+
+  res.json({ success: true, data: { total_workers: total, pending_workers: pending, contacted_workers: contacted } });
 });
 
 app.post('/api/admin/starter-task-tracking/refresh', async (_req, res) => {
@@ -2371,7 +2439,7 @@ app.patch('/api/admin/job-applications/:id', async (req, res) => {
           last_name: lastName,
           full_name: fullName,
           registration_url: 'https://headline-production.up.railway.app/konto/registrieren',
-          subject: 'Ihre Bewerbung wurde angenommen – Registrierung starten',
+          subject: 'Ihre Bewerbung wurde angenommen ï¿½ Registrierung starten',
           application_id: merged.id,
           status: merged.status,
         });
