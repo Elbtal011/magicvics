@@ -1212,6 +1212,9 @@ const fetchHeadlineKycSubmissions = async () => {
 const toHeadlineProxyAssetUrl = (v) => {
   const raw = String(v || '').trim().replace(/^\/+/, '');
   if (!raw) return null;
+  const base = String(HEADLINE_API_BASE || '').replace(/\/$/, '');
+  // Prefer direct absolute asset URL to avoid frontend/router rewrites on /api paths.
+  if (base && raw.startsWith('uploads/webid/')) return `${base}/${raw}`;
   return `/api/admin/kyc-document?path=${encodeURIComponent(raw)}`;
 };
 
