@@ -2305,7 +2305,12 @@ app.post('/api/admin/task-assignments/from-template', async (req, res) => {
     const template = templates.find((t) => t.id === templateId);
     if (!template) return res.status(404).json({ success: false, message: 'Task template not found' });
 
-    const duplicate = assignments.find((a) => a.task_template_id === templateId && a.assignee_id === assigneeId && a.status !== 'rejected' && a.status !== 'canceled');
+    const duplicate = assignments.find((a) => {
+      if (!(a.task_template_id === templateId && a.assignee_id === assigneeId)) return false;
+      const s = String(a.status || '').toLowerCase();
+      // Allow re-assignment after final states, block only active/in-flight tasks.
+      return ['pending', 'open', 'accepted', 'in_review', 'submitted', 'assigned'].includes(s);
+    });
     if (duplicate) {
       return res.json({ success: true, data: { task_id: duplicate.task_id, assignment_id: duplicate.id, message: 'Already assigned' } });
     }
