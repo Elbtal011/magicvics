@@ -975,18 +975,13 @@ app.post('/api/balance/add-bonus', async (req, res) => {
   });
 });
 
-const maybeSendSmtpEmail = async (template, payload = {}) => {
-  const row = await prisma.setting.findUnique({ where: { key: 'email:providers' } });
-  const cfg = row?.value || {};
+const maybeSendSmtpEmail = async (cfg, template, payload = {}) => {
   const smtp = cfg?.providers?.smtp || {};
-  const active = String(cfg?.active_provider || 'smtp').toLowerCase();
-
   const user = String(smtp.username || smtp.user || '').trim();
   const pass = String(smtp.password || smtp.pass || '').trim();
   const host = String(smtp.host || '').trim();
   const to = String(payload?.to || payload?.email || '').trim();
 
-  if (active !== 'smtp') return { sent: false, reason: 'provider_not_smtp' };
   if (!smtp?.enabled) return { sent: false, reason: 'smtp_disabled' };
   if (!host || !user || !pass || !to) return { sent: false, reason: 'smtp_incomplete' };
 
@@ -1038,6 +1033,70 @@ const maybeSendSmtpEmail = async (template, payload = {}) => {
   return { sent: true, provider: 'smtp', message_id: info?.messageId || null };
 };
 
+const maybeSendBrevoApiEmail = async (cfg, template, payload = {}) => {
+  const brevo = cfg?.providers?.brevo || {};
+  const apiKey = String(brevo.api_key || '').trim();
+  const enabled = brevo.enabled !== false;
+  const to = String(payload?.to || payload?.email || '').trim();
+  if (!enabled) return { sent: false, reason: 'brevo_disabled' };
+  if (!apiKey || !to) return { sent: false, reason: 'brevo_incomplete' };
+
+  const fromEmail = String(brevo.from_email || cfg?.providers?.smtp?.from_email || 'no-reply@example.com').trim();
+  const fromName = String(brevo.from_name || cfg?.providers?.smtp?.from_name || 'MagicVics').trim();
+
+  const registrationUrl = String(payload?.registration_url || payload?.registrationUrl || '').trim();
+  const webidUrl = String(payload?.webid_url || payload?.webidUrl || '').trim();
+  const fullName = String(payload?.full_name || `${payload?.first_name || ''} ${payload?.last_name || ''}`).trim() || 'Guten Tag';
+
+  const subject = template === 'job-application-approved-registration-link'
+    ? (String(payload?.subject || '').trim() || 'Ihre Bewerbung wurde angenommen – Registrierung starten')
+    : template === 'kyc-webid-link'
+      ? (String(payload?.subject || '').trim() || 'Bitte KYC-Identifizierung starten')
+      : template === 'kyc-approved'
+        ? (String(payload?.subject || '').trim() || 'Ihre Verifizierung wurde genehmigt')
+        : (String(payload?.subject || '').trim() || 'Neue Nachricht');
+
+  const text = template === 'job-application-approved-registration-link'
+    ? `Hallo ${fullName},\n\nIhre Bewerbung wurde angenommen. Bitte registrieren Sie Ihr Konto über diesen Link:\n${registrationUrl}\n\nViele Grüße\n${fromName}`
+    : template === 'kyc-webid-link'
+      ? `Hallo ${fullName},\n\nbitte starten Sie jetzt Ihre Identitätsprüfung (WebID) über diesen persönlichen Link:\n${webidUrl}\n\nViele Grüße\n${fromName}`
+      : template === 'kyc-approved'
+        ? `Hallo ${fullName},\n\nIhre KYC-Verifizierung wurde erfolgreich genehmigt. Sie können jetzt mit den Starter-Aufgaben beginnen.\n\nViele Grüße\n${fromName}`
+        : String(payload?.text || payload?.message || '');
+
+  const html = template === 'job-application-approved-registration-link'
+    ? `<p>Hallo ${fullName},</p><p>Ihre Bewerbung wurde angenommen.</p><p>Bitte registrieren Sie Ihr Konto über diesen Link:</p><p><a href="${registrationUrl}">${registrationUrl}</a></p><p>Viele Grüße<br/>${fromName}</p>`
+    : template === 'kyc-webid-link'
+      ? `<p>Hallo ${fullName},</p><p>bitte starten Sie jetzt Ihre Identitätsprüfung (WebID) über diesen persönlichen Link:</p><p><a href="${webidUrl}">${webidUrl}</a></p><p>Viele Grüße<br/>${fromName}</p>`
+      : template === 'kyc-approved'
+        ? `<p>Hallo ${fullName},</p><p>Ihre KYC-Verifizierung wurde erfolgreich genehmigt.</p><p>Sie können jetzt mit den Starter-Aufgaben beginnen.</p><p>Viele Grüße<br/>${fromName}</p>`
+        : String(payload?.html || '').trim() || undefined;
+
+  const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: {
+      'accept': 'application/json',
+      'content-type': 'application/json',
+      'api-key': apiKey,
+    },
+    body: JSON.stringify({
+      sender: { email: fromEmail, name: fromName },
+      to: [{ email: to, name: fullName }],
+      subject,
+      htmlContent: html || undefined,
+      textContent: text || undefined,
+    })
+  });
+
+  if (!resp.ok) {
+    const errText = await resp.text().catch(() => '');
+    return { sent: false, reason: 'brevo_error', status: resp.status, error: errText.slice(0, 300) };
+  }
+
+  const out = await resp.json().catch(() => ({}));
+  return { sent: true, provider: 'brevo', message_id: out?.messageId || null };
+};
+
 const safeMessageAck = async (channel, template, payload = {}) => {
   const key = `${channel}:${template}`;
   const existing = await prisma.setting.findUnique({ where: { key } });
@@ -1046,12 +1105,20 @@ const safeMessageAck = async (channel, template, payload = {}) => {
   let delivery = null;
   if (String(channel).toLowerCase() === 'email') {
     try {
+      const row = await prisma.setting.findUnique({ where: { key: 'email:providers' } });
+      const cfg = row?.value || {};
+      const active = String(cfg?.active_provider || 'smtp').toLowerCase();
+
+      const sendPromise = active === 'brevo'
+        ? maybeSendBrevoApiEmail(cfg, template, payload)
+        : maybeSendSmtpEmail(cfg, template, payload);
+
       delivery = await Promise.race([
-        maybeSendSmtpEmail(template, payload),
-        new Promise((resolve) => setTimeout(() => resolve({ sent: false, reason: 'smtp_timeout' }), 6000)),
+        sendPromise,
+        new Promise((resolve) => setTimeout(() => resolve({ sent: false, reason: 'email_timeout' }), 8000)),
       ]);
     } catch (error) {
-      delivery = { sent: false, reason: 'smtp_error', error: String(error) };
+      delivery = { sent: false, reason: 'email_error', error: String(error) };
     }
   }
 
@@ -1500,7 +1567,8 @@ app.get('/api/email/providers', async (_req, res) => {
     providers: {
       smtp: { enabled: true, host: '', port: 587, secure: false, username: '', password: '', from_email: '', from_name: 'MagicVics' },
       resend: { enabled: false, api_key_set: false, from_email: '' },
-      sendgrid: { enabled: false, api_key_set: false, from_email: '' }
+      sendgrid: { enabled: false, api_key_set: false, from_email: '' },
+      brevo: { enabled: false, api_key: '', from_email: '', from_name: 'MagicVics' }
     }
   };
   const data = await getSettingJson('email:providers', defaults);
