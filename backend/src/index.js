@@ -1223,15 +1223,31 @@ app.post('/api/email/:template', async (req, res) => {
   if (template === 'approve-application') {
     const applicationId = String(payload.applicationId || payload.application_id || '').trim();
     if (applicationId) {
-      try {
-        await fetch(`http://127.0.0.1:${port}/api/admin/job-applications/${encodeURIComponent(applicationId)}`, {
-          method: 'PATCH',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ status: 'approved' })
-        });
-      } catch {
-        // keep email endpoint resilient; approval fallback failure is logged via event below
-      }
+      // Fire-and-forget fallback so UI never hangs on this email endpoint.
+      // Approval should primarily happen through /api/admin/job-applications/:id.
+      (async () => {
+        try {
+          const scheme = (String(process.env.PUBLIC_BASE_URL || '').startsWith('https://') || String(process.env.RAILWAY_PUBLIC_DOMAIN || '').trim()) ? 'https' : 'http';
+          const host = String(process.env.PUBLIC_BASE_URL || '').replace(/^https?:\/\//, '').replace(/\/$/, '')
+            || String(process.env.RAILWAY_PUBLIC_DOMAIN || '').trim()
+            || `127.0.0.1:${port}`;
+
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 3500);
+          try {
+            await fetch(`${scheme}://${host}/api/admin/job-applications/${encodeURIComponent(applicationId)}`, {
+              method: 'PATCH',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ status: 'approved' }),
+              signal: controller.signal,
+            });
+          } finally {
+            clearTimeout(timer);
+          }
+        } catch {
+          // Keep endpoint fast/resilient even if fallback patch fails.
+        }
+      })();
     }
   }
 
