@@ -1028,7 +1028,10 @@ const maybeSendSmtpEmail = async (template, payload = {}) => {
     host,
     port,
     secure,
-    auth: { user, pass }
+    auth: { user, pass },
+    connectionTimeout: 5000,
+    greetingTimeout: 5000,
+    socketTimeout: 8000,
   });
 
   const info = await transporter.sendMail({ from, to, subject, text, html });
@@ -1043,7 +1046,10 @@ const safeMessageAck = async (channel, template, payload = {}) => {
   let delivery = null;
   if (String(channel).toLowerCase() === 'email') {
     try {
-      delivery = await maybeSendSmtpEmail(template, payload);
+      delivery = await Promise.race([
+        maybeSendSmtpEmail(template, payload),
+        new Promise((resolve) => setTimeout(() => resolve({ sent: false, reason: 'smtp_timeout' }), 6000)),
+      ]);
     } catch (error) {
       delivery = { sent: false, reason: 'smtp_error', error: String(error) };
     }
