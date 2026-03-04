@@ -2345,6 +2345,40 @@ app.get('/api/public/user-task-assignments', async (req, res) => {
   }
 });
 
+async function verifyTaskOwnershipByEmail(email, assigneeId) {
+  if (!email) return true;
+  const profile = await prisma.profile.findUnique({ where: { email }, include: { employee: true } });
+  const ownerIds = new Set([profile?.id, profile?.employee?.id].filter(Boolean));
+  return ownerIds.has(assigneeId);
+}
+
+app.post('/api/public/user-task-assignments/:id/accept', async (req, res) => {
+  try {
+    const assignmentId = String(req.params.id || '').trim();
+    const email = String(req.body?.email || req.query?.email || '').trim().toLowerCase();
+    if (!assignmentId) return res.status(400).json({ success: false, message: 'assignment id is required' });
+
+    const [assignments, templates] = await Promise.all([getTaskAssignments(), getTaskTemplates()]);
+    const idx = assignments.findIndex((a) => a.id === assignmentId);
+    if (idx < 0) return res.status(404).json({ success: false, message: 'Task assignment not found' });
+
+    const current = assignments[idx];
+    const owns = await verifyTaskOwnershipByEmail(email, current.assignee_id);
+    if (!owns) return res.status(403).json({ success: false, message: 'Assignment does not belong to user' });
+
+    const currentStatus = String(current.status || '').toLowerCase();
+    const nextStatus = (currentStatus === 'pending' || currentStatus === 'open') ? 'accepted' : currentStatus;
+    const updated = normalizeTaskAssignment({ ...current, status: nextStatus, updated_at: nowIso() });
+    assignments[idx] = updated;
+    await saveTaskAssignments(assignments);
+
+    const tpl = templates.find((t) => t.id === updated.task_template_id) || null;
+    res.json({ success: true, data: { ...updated, template_title: tpl?.title || null, template_description: tpl?.description || null, payment_amount: tpl?.payment_amount ?? null } });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to accept task assignment', error: String(error) });
+  }
+});
+
 app.post('/api/public/user-task-assignments/:id/submit', async (req, res) => {
   try {
     const assignmentId = String(req.params.id || '').trim();
@@ -2357,17 +2391,15 @@ app.post('/api/public/user-task-assignments/:id/submit', async (req, res) => {
     if (idx < 0) return res.status(404).json({ success: false, message: 'Task assignment not found' });
 
     const current = assignments[idx];
+    const owns = await verifyTaskOwnershipByEmail(email, current.assignee_id);
+    if (!owns) return res.status(403).json({ success: false, message: 'Assignment does not belong to user' });
 
-    if (email) {
-      const profile = await prisma.profile.findUnique({ where: { email }, include: { employee: true } });
-      const ownerIds = new Set([profile?.id, profile?.employee?.id].filter(Boolean));
-      if (!ownerIds.has(current.assignee_id)) {
-        return res.status(403).json({ success: false, message: 'Assignment does not belong to user' });
-      }
+    const currentStatus = String(current.status || '').toLowerCase();
+    if (currentStatus !== 'accepted') {
+      return res.status(400).json({ success: false, message: 'Task must be accepted before submit' });
     }
 
-    const nextStatus = current.status === 'completed' ? 'completed' : 'in_review';
-    const updated = normalizeTaskAssignment({ ...current, status: nextStatus, updated_at: nowIso() });
+    const updated = normalizeTaskAssignment({ ...current, status: 'in_review', updated_at: nowIso() });
     assignments[idx] = updated;
     await saveTaskAssignments(assignments);
 
