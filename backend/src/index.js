@@ -2180,7 +2180,8 @@ const normalizeTaskAssignment = (row = {}) => ({
   task_template_id: String(row.task_template_id || '').trim(),
   assignee_id: String(row.assignee_id || '').trim(),
   status: String(row.status || 'pending').toLowerCase(),
-  due_date: row.due_date || new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+  due_date: row.due_date || null,
+  submitted_at: row.submitted_at || null,
   created_by: row.created_by || null,
   current_step: Number(row.current_step ?? 0),
   created_at: row.created_at || nowIso(),
@@ -2302,6 +2303,70 @@ app.post('/api/admin/task-assignments/from-template', async (req, res) => {
   }
 });
 
+const enrichTaskAssignments = async (assignments) => {
+  const templates = await getTaskTemplates();
+  const templateById = new Map(templates.map((t) => [t.id, t]));
+
+  const assigneeIds = Array.from(new Set(assignments.map((a) => String(a.assignee_id || '').trim()).filter(Boolean)));
+  const profiles = await prisma.profile.findMany({ where: { id: { in: assigneeIds } }, include: { employee: true } });
+  const profileById = new Map(profiles.map((p) => [p.id, p]));
+  const employeeById = new Map(profiles.map((p) => [p.employee?.id, p]).filter(([k]) => Boolean(k)));
+
+  return assignments.map((a) => {
+    const tpl = templateById.get(a.task_template_id) || null;
+    const profile = profileById.get(a.assignee_id) || employeeById.get(a.assignee_id) || null;
+    const profileShape = profile ? {
+      id: profile.id,
+      first_name: profile.firstName || '',
+      last_name: profile.lastName || '',
+      email: profile.email || ''
+    } : null;
+
+    return {
+      ...a,
+      task_template: tpl,
+      task_templates: tpl,
+      profiles: profileShape,
+      profile: profileShape,
+      template_title: tpl?.title || null,
+      template_description: tpl?.description || null,
+      template_steps: Array.isArray(tpl?.steps) ? tpl.steps : [],
+      template_required_attachments: Array.isArray(tpl?.required_attachments) ? tpl.required_attachments : [],
+      estimated_hours: tpl?.estimated_hours ?? null,
+      payment_amount: tpl?.payment_amount ?? null
+    };
+  });
+};
+
+app.get('/api/admin/task-assignments', async (_req, res) => {
+  try {
+    const assignments = await getTaskAssignments();
+    const enriched = await enrichTaskAssignments(assignments);
+    res.json({ success: true, count: enriched.length, data: enriched });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to fetch task assignments', error: String(error) });
+  }
+});
+
+app.patch('/api/admin/task-assignments/:id', async (req, res) => {
+  try {
+    const id = String(req.params.id || '').trim();
+    const patch = req.body || {};
+    const current = await getTaskAssignments();
+    const idx = current.findIndex((a) => a.id === id);
+    if (idx < 0) return res.status(404).json({ success: false, message: 'Task assignment not found' });
+
+    const merged = normalizeTaskAssignment({ ...current[idx], ...patch, id: current[idx].id, created_at: current[idx].created_at });
+    current[idx] = merged;
+    await saveTaskAssignments(current);
+
+    const enriched = await enrichTaskAssignments([merged]);
+    res.json({ success: true, data: enriched[0] || merged });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to update task assignment', error: String(error) });
+  }
+});
+
 app.get('/api/public/user-task-assignments', async (req, res) => {
   try {
     const email = String(req.query.email || '').trim().toLowerCase();
@@ -2311,8 +2376,7 @@ app.get('/api/public/user-task-assignments', async (req, res) => {
       return res.status(400).json({ success: false, message: 'email or assignee_id is required' });
     }
 
-    const [assignments, templates] = await Promise.all([getTaskAssignments(), getTaskTemplates()]);
-    const templateById = new Map(templates.map((t) => [t.id, t]));
+    const assignments = await getTaskAssignments();
 
     const assigneeIds = new Set();
     if (assigneeId) assigneeIds.add(assigneeId);
@@ -2324,22 +2388,10 @@ app.get('/api/public/user-task-assignments', async (req, res) => {
     }
 
     const ids = Array.from(assigneeIds);
-    const filtered = assignments
-      .filter((a) => ids.includes(String(a.assignee_id || '').trim()))
-      .map((a) => {
-        const tpl = templateById.get(a.task_template_id) || null;
-        return {
-          ...a,
-          template_title: tpl?.title || null,
-          template_description: tpl?.description || null,
-          template_steps: Array.isArray(tpl?.steps) ? tpl.steps : [],
-          template_required_attachments: Array.isArray(tpl?.required_attachments) ? tpl.required_attachments : [],
-          payment_amount: tpl?.payment_amount ?? null
-        };
-      })
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    const filteredBase = assignments.filter((a) => ids.includes(String(a.assignee_id || '').trim()));
+    const filtered = await enrichTaskAssignments(filteredBase);
 
-    res.json({ success: true, count: filtered.length, data: filtered });
+    res.json({ success: true, count: filtered.length, data: filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to fetch user task assignments', error: String(error) });
   }
@@ -2399,7 +2451,7 @@ app.post('/api/public/user-task-assignments/:id/submit', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Task must be accepted before submit' });
     }
 
-    const updated = normalizeTaskAssignment({ ...current, status: 'in_review', updated_at: nowIso() });
+    const updated = normalizeTaskAssignment({ ...current, status: 'submitted', submitted_at: nowIso(), updated_at: nowIso() });
     assignments[idx] = updated;
     await saveTaskAssignments(assignments);
 
