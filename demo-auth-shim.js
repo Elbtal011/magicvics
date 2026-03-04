@@ -1199,7 +1199,8 @@
           const admins = (store.get('profiles') || []).filter((x) => String(x.role || '').toLowerCase() === 'admin');
           store.set('profiles', [...admins, ...bridged]);
 
-          const filteredRows = applyQuery(bridged, urlObj.searchParams);
+          const sourceRows = [...admins, ...bridged];
+          const filteredRows = applyQuery(sourceRows, urlObj.searchParams);
           if (method === 'HEAD') {
             const totalCount = filteredRows.length;
             return new Response('', {
@@ -2001,6 +2002,7 @@
 
   console.info(`[demo-auth-shim] enabled (${useRealApi ? 'backend-default' : 'demo-forced'})`);
 })();
+
 
 
 
