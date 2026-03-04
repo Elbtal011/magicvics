@@ -934,6 +934,20 @@ app.patch('/api/admin/users/:id', async (req, res) => {
     });
   }
 
+  const becameDeclined = ['rejected', 'declined', 'abgelehnt'].includes(nextKycStatus) && !['rejected', 'declined', 'abgelehnt'].includes(previousKycStatus);
+  if (becameDeclined) {
+    const { caseId, webidUrl } = await ensureKycInviteForProfile(updated, 'email');
+    await safeMessageAck('email', 'kyc-webid-link', {
+      to: updated.email,
+      email: updated.email,
+      first_name: updated.firstName || '',
+      last_name: updated.lastName || '',
+      full_name: updated.fullName || '',
+      case_id: caseId,
+      webid_url: webidUrl,
+    });
+  }
+
   res.json({ user: serializeAdminUser(updated) });
 });
 
@@ -1204,13 +1218,24 @@ app.get('/api/admin/kyc/profiles-feed', async (_req, res) => {
 
     const invites = await getKycInvites();
     const submissions = await fetchHeadlineKycSubmissions();
-    const subByCase = new Map(submissions.map((s) => [normalizeCaseId(s.case_id), s]));
+    const subByCase = new Map(
+      submissions
+        .map((s) => {
+          const key = normalizeCaseId(s.case_id || s.id);
+          return key ? [key, s] : null;
+        })
+        .filter(Boolean)
+    );
 
     const data = users.map((u) => {
       const inv = invites.find((x) => String(x.profileId) === String(u.id));
       const sub = inv ? subByCase.get(normalizeCaseId(inv.caseId)) : null;
 
-      const kycStatus = sub ? (sub.kyc_status || 'in_review') : (u.kycStatus || 'pending');
+      const rawSubStatus = String(sub?.kyc_status || '').toLowerCase();
+      const mappedSubStatus = ['in_review', 'uploaded', 'pending_review', 'submitted'].includes(rawSubStatus)
+        ? 'submitted'
+        : (rawSubStatus || 'submitted');
+      const kycStatus = sub ? mappedSubStatus : (u.kycStatus || 'pending');
       const docs = sub
         ? {
             identity_card_front: sub.kyc_documents?.identity_card_front || null,
