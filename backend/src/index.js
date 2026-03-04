@@ -1228,7 +1228,8 @@ app.get('/api/admin/kyc-document', async (req, res) => {
         break;
       }
     }
-    rawPath = rawPath.replace(/^\/+/, '');
+    // extra normalization for stubborn encoded slashes coming through unchanged
+    rawPath = rawPath.replace(/%2F/gi, '/').replace(/^\/+/, '');
     if (!rawPath || !rawPath.startsWith('uploads/webid/')) {
       return res.status(400).json({ success: false, message: 'Invalid document path' });
     }
