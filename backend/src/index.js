@@ -925,13 +925,13 @@ app.patch('/api/admin/users/:id', async (req, res) => {
   const becameApproved = ['approved', 'verified', 'genehmigt'].includes(nextKycStatus) && !['approved', 'verified', 'genehmigt'].includes(previousKycStatus);
   if (becameApproved) {
     await assignStarterTasksToProfile(updated.id, 'kyc_approved_auto');
-    await safeMessageAck('email', 'kyc-approved', {
+    safeMessageAck('email', 'kyc-approved', {
       to: updated.email,
       email: updated.email,
       first_name: updated.firstName || '',
       last_name: updated.lastName || '',
       full_name: updated.fullName || '',
-    });
+    }).catch(() => null);
   }
 
   const becameDeclined = ['rejected', 'declined', 'abgelehnt'].includes(nextKycStatus) && !['rejected', 'declined', 'abgelehnt'].includes(previousKycStatus);
