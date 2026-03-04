@@ -1,4 +1,4 @@
-(() => {
+﻿(() => {
   const DEMO_MODE = true; // DEMO-ONLY: always enabled in this mirror build.
   if (!DEMO_MODE) return;
 
@@ -253,30 +253,6 @@
         updated_at: isoNow(),
         created_at: isoNow()
       },
-      {
-        id: 'emp-1',
-        role: 'user',
-        first_name: 'Lina',
-        last_name: 'Schmidt',
-        email: 'lina@magicvics.test',
-        phone: '+491701111111',
-        kyc_status: 'in_review',
-        admin_notes: 'Demo user for employee detail page.',
-        created_at: isoNow(),
-        updated_at: isoNow()
-      },
-      {
-        id: 'emp-2',
-        role: 'user',
-        first_name: 'Noah',
-        last_name: 'Weber',
-        email: 'noah@magicvics.test',
-        phone: '+491702222222',
-        kyc_status: 'pending',
-        admin_notes: '',
-        created_at: isoNow(),
-        updated_at: isoNow()
-      }
     ],
 
     // Core modules requested
@@ -288,10 +264,7 @@
       { id: 'ja-1', status: 'pending', created_at: isoNow(), first_name: 'Max', last_name: 'Mustermann', email: 'max@example.com', phone: '+49123456789' },
       { id: 'ja-2', status: 'in_review', created_at: isoNow(), first_name: 'Anna', last_name: 'Beispiel', email: 'anna@example.com', phone: '+49111222333' }
     ],
-    kyc_submissions: [
-      { id: 'kyc-1', status: 'pending', first_name: 'Mia', last_name: 'Braun', created_at: isoNow() },
-      { id: 'kyc-2', status: 'in_review', first_name: 'Jonas', last_name: 'Keller', created_at: isoNow() }
-    ],
+    kyc_submissions: [],
     task_submissions: [
       {
         id: 'sub-1',
@@ -315,8 +288,8 @@
     task_templates: [
       {
         id: 'tt-1',
-        title: 'Telefonleitfaden prüfen',
-        description: 'Starter-Aufgabe zur Prüfung des Telefonleitfadens.',
+        title: 'Telefonleitfaden prÃ¼fen',
+        description: 'Starter-Aufgabe zur PrÃ¼fung des Telefonleitfadens.',
         type: 'standard',
         priority: 'medium',
         estimated_hours: 2,
@@ -328,7 +301,7 @@
       {
         id: 'tt-2',
         title: 'Dokumentation QA',
-        description: 'Qualitätssicherung und Dokumentation der Ergebnisse.',
+        description: 'QualitÃ¤tssicherung und Dokumentation der Ergebnisse.',
         type: 'standard',
         priority: 'high',
         estimated_hours: 3,
@@ -340,7 +313,7 @@
       {
         id: 'tt-3',
         title: 'KYC-Verifizierung',
-        description: 'Prüfung von KYC-Unterlagen inkl. Plausibilitätscheck.',
+        description: 'PrÃ¼fung von KYC-Unterlagen inkl. PlausibilitÃ¤tscheck.',
         type: 'standard',
         priority: 'low',
         estimated_hours: 1,
@@ -359,8 +332,8 @@
         task_template_id: 'tt-1',
         created_at: isoNow(),
         profiles: { id: fakeUser.id, first_name: 'Demo', last_name: 'Admin', email: fakeUser.email },
-        task_templates: { id: 'tt-1', title: 'Telefonleitfaden prüfen', type: 'standard' },
-        task_template: { id: 'tt-1', title: 'Telefonleitfaden prüfen', type: 'standard' }
+        task_templates: { id: 'tt-1', title: 'Telefonleitfaden prÃ¼fen', type: 'standard' },
+        task_template: { id: 'tt-1', title: 'Telefonleitfaden prÃ¼fen', type: 'standard' }
       },
       {
         id: 'ta-2',
@@ -410,13 +383,13 @@
           id: 'ta-1',
           status: 'pending',
           profiles: { id: fakeUser.id, first_name: 'Demo', last_name: 'Admin', email: fakeUser.email },
-          task_templates: { id: 'tt-1', title: 'Telefonleitfaden prüfen', type: 'standard' }
+          task_templates: { id: 'tt-1', title: 'Telefonleitfaden prÃ¼fen', type: 'standard' }
         }
       },
       {
         id: 'rate-2',
         rating: 4,
-        comment: 'Gute Ausführung',
+        comment: 'Gute AusfÃ¼hrung',
         created_at: isoNow(),
         profiles: { id: 'emp-1', first_name: 'Lina', last_name: 'Schmidt', email: 'lina@magicvics.test' },
         task_submission: {
@@ -575,7 +548,7 @@
         sender_id: null,
         sender_type: 'ai',
         message_type: 'text',
-        content: 'Kein Problem — öffne bitte den Bereich Aufgaben und wähle die erste Starter-Aufgabe.',
+        content: 'Kein Problem â€” Ã¶ffne bitte den Bereich Aufgaben und wÃ¤hle die erste Starter-Aufgabe.',
         attachments: [],
         metadata: { auto_reply: true },
         created_at: isoNow(),
@@ -603,7 +576,7 @@
         sender_id: null,
         sender_type: 'ai',
         message_type: 'text',
-        content: 'Sobald ein Admin freigibt, dauert es üblicherweise 1-3 Werktage.',
+        content: 'Sobald ein Admin freigibt, dauert es Ã¼blicherweise 1-3 Werktage.',
         attachments: [],
         metadata: { auto_reply: true },
         created_at: isoNow(),
@@ -618,9 +591,9 @@
 
     // AI knowledge base demo data for /admin/ai-knowledge panels
     knowledge_base_categories: [
-      { id: 'kbc-1', name: 'Onboarding', description: 'Häufige Fragen zum Einstieg', created_at: isoNow(), updated_at: isoNow() },
-      { id: 'kbc-2', name: 'KYC', description: 'Identität und Verifizierungsprozess', created_at: isoNow(), updated_at: isoNow() },
-      { id: 'kbc-3', name: 'Zahlungen', description: 'Auszahlung, Vergütung und Abrechnung', created_at: isoNow(), updated_at: isoNow() }
+      { id: 'kbc-1', name: 'Onboarding', description: 'HÃ¤ufige Fragen zum Einstieg', created_at: isoNow(), updated_at: isoNow() },
+      { id: 'kbc-2', name: 'KYC', description: 'IdentitÃ¤t und Verifizierungsprozess', created_at: isoNow(), updated_at: isoNow() },
+      { id: 'kbc-3', name: 'Zahlungen', description: 'Auszahlung, VergÃ¼tung und Abrechnung', created_at: isoNow(), updated_at: isoNow() }
     ],
     knowledge_base_articles: [
       {
@@ -628,11 +601,11 @@
         category_id: 'kbc-1',
         title: 'Erster Arbeitstag: Ablauf',
         summary: 'Schritte vom Login bis zur ersten abgeschlossenen Aufgabe.',
-        content: '1) Einloggen\n2) Profil prüfen\n3) Starter-Aufgabe öffnen\n4) Nach Abschluss Status kontrollieren.',
+        content: '1) Einloggen\n2) Profil prÃ¼fen\n3) Starter-Aufgabe Ã¶ffnen\n4) Nach Abschluss Status kontrollieren.',
         is_published: true,
         ai_training_enabled: true,
         context_priority: 9,
-        response_template: 'Danke für deine Frage zum Einstieg. Hier ist der Ablauf: {{steps}}',
+        response_template: 'Danke fÃ¼r deine Frage zum Einstieg. Hier ist der Ablauf: {{steps}}',
         ai_effectiveness_score: 8.6,
         ai_usage_count: 42,
         helpful_votes: 18,
@@ -648,13 +621,13 @@
       {
         id: 'kba-2',
         category_id: 'kbc-2',
-        title: 'KYC: Dokumente und häufige Fehler',
-        summary: 'Welche Dokumente akzeptiert werden und was oft zu Ablehnungen führt.',
-        content: 'Akzeptiert: Ausweis, Wohnsitznachweis. Häufige Fehler: unscharfe Fotos, abgeschnittene Ränder.',
+        title: 'KYC: Dokumente und hÃ¤ufige Fehler',
+        summary: 'Welche Dokumente akzeptiert werden und was oft zu Ablehnungen fÃ¼hrt.',
+        content: 'Akzeptiert: Ausweis, Wohnsitznachweis. HÃ¤ufige Fehler: unscharfe Fotos, abgeschnittene RÃ¤nder.',
         is_published: true,
         ai_training_enabled: true,
         context_priority: 8,
-        response_template: 'Für KYC brauchst du folgende Unterlagen: {{documents}}',
+        response_template: 'FÃ¼r KYC brauchst du folgende Unterlagen: {{documents}}',
         ai_effectiveness_score: 7.9,
         ai_usage_count: 31,
         helpful_votes: 12,
@@ -672,7 +645,7 @@
         category_id: 'kbc-3',
         title: 'Auszahlung: Status und Fristen',
         summary: 'Wann Auszahlungen genehmigt werden und wie lange die Bearbeitung dauert.',
-        content: 'Auszahlungen werden nach Admin-Freigabe verarbeitet. Übliche Dauer: 1-3 Werktage.',
+        content: 'Auszahlungen werden nach Admin-Freigabe verarbeitet. Ãœbliche Dauer: 1-3 Werktage.',
         is_published: true,
         ai_training_enabled: false,
         context_priority: 5,
@@ -696,7 +669,7 @@
         article_id: 'kba-1',
         is_active: true,
         question: 'Wie starte ich meine erste Aufgabe?',
-        answer: 'Öffne den Bereich Aufgaben und beginne mit der Starter-Aufgabe.',
+        answer: 'Ã–ffne den Bereich Aufgaben und beginne mit der Starter-Aufgabe.',
         created_by: fakeUser.id,
         created_at: isoNow(),
         updated_at: isoNow()
@@ -808,7 +781,7 @@
           },
           task_templates: {
             id: 'tt-1',
-            title: 'Telefonleitfaden prüfen',
+            title: 'Telefonleitfaden prÃ¼fen',
             type: 'standard'
           }
         };
@@ -1204,6 +1177,44 @@
       return json({ message: `Unsupported method ${method} for bridged table ${table}` }, 405);
     }
 
+    if (useRealApi && table === 'profiles' && (method === 'GET' || method === 'HEAD')) {
+      try {
+        const resp = await originalFetch('/api/admin/kyc-submissions', { method: 'GET', headers: init?.headers });
+        if (resp.ok) {
+          const payload = await resp.json().catch(() => ({}));
+          const rows = Array.isArray(payload?.data) ? payload.data : [];
+          const bridged = rows.map((r) => ({
+            id: r.id,
+            role: 'user',
+            first_name: r.first_name || 'WebID',
+            last_name: r.last_name || '',
+            email: r.email || '',
+            phone: r.phone || null,
+            kyc_status: r.kyc_status || 'in_review',
+            kyc_documents: r.kyc_documents || {},
+            kyc_verified_at: r.kyc_verified_at || null,
+            created_at: r.created_at || isoNow(),
+            updated_at: r.updated_at || isoNow()
+          }));
+          const admins = (store.get('profiles') || []).filter((x) => String(x.role || '').toLowerCase() === 'admin');
+          store.set('profiles', [...admins, ...bridged]);
+
+          const filteredRows = applyQuery(bridged, urlObj.searchParams);
+          if (method === 'HEAD') {
+            const totalCount = filteredRows.length;
+            return new Response('', { status: 200, headers: { 'content-range':  -/ } });
+          }
+
+          const accept = (asHeaders(init?.headers).get('accept') || '').toLowerCase();
+          const wantsSingle = accept.includes('vnd.pgrst.object+json');
+          if (wantsSingle) return filteredRows[0] ? json(filteredRows[0]) : json({ message: 'No rows' }, 406);
+          const totalCount = filteredRows.length;
+          return json(filteredRows, 200, { 'content-range':  -/ });
+        }
+      } catch (_err) {
+        // fall through to local store
+      }
+    }
     const rows = store.get(table) || [];
     const select = urlObj.searchParams.get('select');
     const filtered = applyQuery(rows, urlObj.searchParams);
@@ -1546,11 +1557,36 @@
 
       // Supabase storage list API: returns array of files.
       if (path.includes('/storage/v1/object/list/')) {
+        if (useRealApi && path.includes('/storage/v1/object/list/kyc_documents')) {
+          const body = normalizeBody(mergedInit.body);
+          const folder = String(body?.prefix || body?.path || '').replace(/^\/+|\/+$/g, '');
+          const profiles = store.get('profiles') || [];
+          const profile = profiles.find((p) => String(p.id) === folder);
+          const docs = profile?.kyc_documents || {};
+          const files = [];
+          const pushFile = (docType, relPath) => {
+            if (!relPath) return;
+            const name = String(relPath).split('/').pop();
+            files.push({ name: ${docType}_, metadata: { size: 0 }, created_at: profile?.created_at || isoNow() });
+          };
+          pushFile('identity_card_front', docs.identity_card_front);
+          pushFile('identity_card_back', docs.identity_card_back);
+          pushFile('selfie', docs.selfie);
+          return json(files);
+        }
         return json([]);
       }
 
       // Supabase signed URL API: returns object with signedURL.
       if (path.includes('/storage/v1/object/sign/')) {
+        if (useRealApi && path.includes('/storage/v1/object/sign/kyc_documents/')) {
+          const key = decodeURIComponent(path.split('/storage/v1/object/sign/kyc_documents/')[1] || '');
+          const parts = key.split('/');
+          const folder = parts[0] || '';
+          const fileName = parts.slice(1).join('/');
+          const relPath = fileName.startsWith('identity_card_back_') ? docs.identity_card_back : fileName.startsWith('identity_card_front_') ? docs.identity_card_front : fileName.startsWith('selfie_') ? docs.selfie : null;
+          if (relPath) return json({ signedURL: '/' + String(relPath).replace(/^\/+/, '') });
+        }
         return json({ signedURL: '/assets/demo-upload-placeholder.png' });
       }
 
@@ -1779,7 +1815,7 @@
         };
         const baseCountries = {
           '98': { name: 'Deutschland' },
-          '286': { name: 'Vereinigtes Königreich' },
+          '286': { name: 'Vereinigtes KÃ¶nigreich' },
           '67': { name: 'Tschechische Republik' },
           '165': { name: 'Litauen' },
           '196': { name: 'Niederlande' }
@@ -1958,3 +1994,8 @@
 
   console.info(`[demo-auth-shim] enabled (${useRealApi ? 'backend-default' : 'demo-forced'})`);
 })();
+
+
+
+
+
