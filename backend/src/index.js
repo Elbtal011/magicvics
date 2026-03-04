@@ -884,6 +884,8 @@ app.patch('/api/admin/users/:id', async (req, res) => {
   const role = metadata.role ?? body.role;
   const bannedUntil = body.ban_duration !== undefined ? parseBanDurationToDate(body.ban_duration) : undefined;
 
+  const previousKycStatus = String(existing.kycStatus || '').toLowerCase();
+
   const updated = await prisma.$transaction(async (tx) => {
     const fullNameFromUpdate = `${firstName ?? existing.firstName ?? ''} ${lastName ?? existing.lastName ?? ''}`.trim();
     const profile = await tx.profile.update({
@@ -900,18 +902,33 @@ app.patch('/api/admin/users/:id', async (req, res) => {
         postalCode: body.postal_code !== undefined ? body.postal_code || null : undefined,
         city: body.city !== undefined ? body.city || null : undefined,
         nationality: body.nationality !== undefined ? body.nationality || null : undefined,
+        kycStatus: body.kyc_status ?? undefined,
+        kycVerifiedAt: body.kyc_status !== undefined && ['approved', 'verified', 'genehmigt'].includes(String(body.kyc_status || '').toLowerCase()) ? new Date() : undefined,
         bannedUntil,
         adminNotes: body.admin_notes !== undefined ? body.admin_notes || null : undefined
       },
       include: { employee: true }
     });
 
-    if (role === 'user' && !profile.employee) {
+    if ((role === 'user' || role === 'caller') && !profile.employee) {
       await tx.employee.create({ data: { profileId: existing.id, status: 'active', department: body.position || null, hiredAt: new Date() } });
     }
 
     return tx.profile.findUnique({ where: { id: existing.id }, include: { employee: true } });
   });
+
+  const nextKycStatus = String(updated?.kycStatus || '').toLowerCase();
+  const becameApproved = ['approved', 'verified', 'genehmigt'].includes(nextKycStatus) && !['approved', 'verified', 'genehmigt'].includes(previousKycStatus);
+  if (becameApproved) {
+    await assignStarterTasksToProfile(updated.id, 'kyc_approved_auto');
+    await safeMessageAck('email', 'kyc-approved', {
+      to: updated.email,
+      email: updated.email,
+      first_name: updated.firstName || '',
+      last_name: updated.lastName || '',
+      full_name: updated.fullName || '',
+    });
+  }
 
   res.json({ user: serializeAdminUser(updated) });
 });
@@ -980,19 +997,32 @@ const maybeSendSmtpEmail = async (template, payload = {}) => {
   const from = fromName ? `${fromName} <${fromEmail}>` : fromEmail;
 
   const registrationUrl = String(payload?.registration_url || payload?.registrationUrl || '').trim();
+  const webidUrl = String(payload?.webid_url || payload?.webidUrl || '').trim();
   const fullName = String(payload?.full_name || `${payload?.first_name || ''} ${payload?.last_name || ''}`).trim() || 'Guten Tag';
 
   const subject = template === 'job-application-approved-registration-link'
     ? (String(payload?.subject || '').trim() || 'Ihre Bewerbung wurde angenommen – Registrierung starten')
-    : (String(payload?.subject || '').trim() || 'Neue Nachricht');
+    : template === 'kyc-webid-link'
+      ? (String(payload?.subject || '').trim() || 'Bitte KYC-Identifizierung starten')
+      : template === 'kyc-approved'
+        ? (String(payload?.subject || '').trim() || 'Ihre Verifizierung wurde genehmigt')
+        : (String(payload?.subject || '').trim() || 'Neue Nachricht');
 
   const text = template === 'job-application-approved-registration-link'
     ? `Hallo ${fullName},\n\nIhre Bewerbung wurde angenommen. Bitte registrieren Sie Ihr Konto über diesen Link:\n${registrationUrl}\n\nViele Grüße\n${fromName}`
-    : String(payload?.text || payload?.message || '');
+    : template === 'kyc-webid-link'
+      ? `Hallo ${fullName},\n\nbitte starten Sie jetzt Ihre Identitätsprüfung (WebID) über diesen persönlichen Link:\n${webidUrl}\n\nViele Grüße\n${fromName}`
+      : template === 'kyc-approved'
+        ? `Hallo ${fullName},\n\nIhre KYC-Verifizierung wurde erfolgreich genehmigt. Sie können jetzt mit den Starter-Aufgaben beginnen.\n\nViele Grüße\n${fromName}`
+        : String(payload?.text || payload?.message || '');
 
   const html = template === 'job-application-approved-registration-link'
     ? `<p>Hallo ${fullName},</p><p>Ihre Bewerbung wurde angenommen.</p><p>Bitte registrieren Sie Ihr Konto über diesen Link:</p><p><a href="${registrationUrl}">${registrationUrl}</a></p><p>Viele Grüße<br/>${fromName}</p>`
-    : String(payload?.html || '').trim() || undefined;
+    : template === 'kyc-webid-link'
+      ? `<p>Hallo ${fullName},</p><p>bitte starten Sie jetzt Ihre Identitätsprüfung (WebID) über diesen persönlichen Link:</p><p><a href="${webidUrl}">${webidUrl}</a></p><p>Viele Grüße<br/>${fromName}</p>`
+      : template === 'kyc-approved'
+        ? `<p>Hallo ${fullName},</p><p>Ihre KYC-Verifizierung wurde erfolgreich genehmigt.</p><p>Sie können jetzt mit den Starter-Aufgaben beginnen.</p><p>Viele Grüße<br/>${fromName}</p>`
+        : String(payload?.html || '').trim() || undefined;
 
   const transporter = nodemailer.createTransport({
     host,
@@ -1050,6 +1080,30 @@ const getKycInvites = async () => {
 
 const setKycInvites = async (invites) => {
   await saveJsonSetting('kyc:webid:invites', { invites });
+};
+
+const ensureKycInviteForProfile = async (profile, type = 'email') => {
+  const invites = await getKycInvites();
+  const existingIdx = invites.findIndex((x) => String(x.profileId) === String(profile.id));
+  const caseId = existingIdx >= 0 ? invites[existingIdx].caseId : generateWebIdCaseId();
+  const webidUrl = `${HEADLINE_WEBID_BASE}/webid/${encodeURIComponent(caseId)}`;
+
+  const entry = {
+    profileId: profile.id,
+    email: profile.email,
+    caseId,
+    webidUrl,
+    type,
+    status: 'sent',
+    updatedAt: nowIso(),
+    sentAt: nowIso(),
+  };
+
+  if (existingIdx >= 0) invites[existingIdx] = { ...invites[existingIdx], ...entry };
+  else invites.unshift(entry);
+  await setKycInvites(invites.slice(0, 1000));
+
+  return { caseId, webidUrl };
 };
 
 const fetchHeadlineKycSubmissions = async () => {
@@ -1121,25 +1175,21 @@ app.post('/api/admin/kyc/:workerId/send-reminder', async (req, res) => {
     const profile = await findProfileByAnyId(workerId);
     if (!profile) return res.status(404).json({ success: false, message: 'User not found' });
 
-    const invites = await getKycInvites();
-    const existingIdx = invites.findIndex((x) => String(x.profileId) === String(profile.id));
-    const caseId = existingIdx >= 0 ? invites[existingIdx].caseId : generateWebIdCaseId();
-    const webidUrl = `${HEADLINE_WEBID_BASE}/webid/${encodeURIComponent(caseId)}`;
+    const { caseId, webidUrl } = await ensureKycInviteForProfile(profile, type);
 
-    const entry = {
-      profileId: profile.id,
-      email: profile.email,
-      caseId,
-      webidUrl,
-      type,
-      status: 'sent',
-      updatedAt: nowIso(),
-      sentAt: nowIso(),
-    };
-
-    if (existingIdx >= 0) invites[existingIdx] = { ...invites[existingIdx], ...entry };
-    else invites.unshift(entry);
-    await setKycInvites(invites.slice(0, 1000));
+    let emailEvent = null;
+    if (type === 'email' || type === 'both') {
+      emailEvent = await safeMessageAck('email', 'kyc-webid-link', {
+        to: profile.email,
+        email: profile.email,
+        first_name: profile.firstName || '',
+        last_name: profile.lastName || '',
+        full_name: profile.fullName || '',
+        case_id: caseId,
+        webid_url: webidUrl,
+        admin_id: req.body?.adminId || null,
+      });
+    }
 
     const event = await safeMessageAck('kyc-reminder', type, {
       profile_id: profile.id,
@@ -1147,6 +1197,7 @@ app.post('/api/admin/kyc/:workerId/send-reminder', async (req, res) => {
       case_id: caseId,
       webid_url: webidUrl,
       admin_id: req.body?.adminId || null,
+      email_event_id: emailEvent?.id || null,
     });
 
     return res.json({
@@ -1158,6 +1209,7 @@ app.post('/api/admin/kyc/:workerId/send-reminder', async (req, res) => {
         webidUrl,
         caseId,
         event_id: event.id,
+        email_event_id: emailEvent?.id || null,
       }
     });
   } catch (error) {
@@ -2491,6 +2543,7 @@ app.patch('/api/admin/job-applications/:id', async (req, res) => {
         }
 
         const starterTaskResult = await assignStarterTasksToProfile(profile.id, 'job_application_approval');
+        const { caseId, webidUrl } = await ensureKycInviteForProfile(profile, 'email');
 
         await safeMessageAck('email', 'job-application-approved-registration-link', {
           to: appEmail,
@@ -2498,7 +2551,7 @@ app.patch('/api/admin/job-applications/:id', async (req, res) => {
           last_name: lastName,
           full_name: fullName,
           registration_url: 'https://headline-production.up.railway.app/konto/registrieren',
-          subject: 'Ihre Bewerbung wurde angenommen � Registrierung starten',
+          subject: 'Ihre Bewerbung wurde angenommen - Registrierung starten',
           application_id: merged.id,
           status: merged.status,
         });
@@ -2510,6 +2563,8 @@ app.patch('/api/admin/job-applications/:id', async (req, res) => {
           full_name: employee.profile?.fullName || fullName,
           starter_tasks_assigned: starterTaskResult.assigned_count,
           starter_task_assignment_ids: starterTaskResult.assignment_ids,
+          kyc_case_id: caseId,
+          kyc_webid_url: webidUrl,
         };
       }
     }
