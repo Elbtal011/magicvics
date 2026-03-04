@@ -907,7 +907,6 @@ app.patch('/api/admin/users/:id', async (req, res) => {
         city: body.city !== undefined ? body.city || null : undefined,
         nationality: body.nationality !== undefined ? body.nationality || null : undefined,
         kycStatus: body.kyc_status ?? undefined,
-        kycVerifiedAt: body.kyc_status !== undefined && ['approved', 'verified', 'genehmigt'].includes(String(body.kyc_status || '').toLowerCase()) ? new Date() : undefined,
         bannedUntil,
         adminNotes: body.admin_notes !== undefined ? body.admin_notes || null : undefined
       },
@@ -1258,7 +1257,7 @@ app.post('/api/admin/kyc/:workerId/approve', async (req, res) => {
 
     const updated = await prisma.profile.update({
       where: { id: profile.id },
-      data: { kycStatus: 'approved', kycVerifiedAt: new Date() },
+      data: { kycStatus: 'approved' },
     });
 
     assignStarterTasksToProfile(updated.id, 'kyc_approved_auto').catch(() => null);
