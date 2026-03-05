@@ -58,7 +58,7 @@
   // Keep enforcing because React rerenders can restore original text/icon.
   const enforceBrand = () => applyBrandPatch();
 
-  // Top "?" help icon should always open /admin/updates.
+  // Top "?" help icon should always open /admin/email-providers.
   function patchSupportHelpIcon() {
     const candidates = Array.from(document.querySelectorAll('button, a, [role="button"]'));
     let patched = false;
@@ -78,7 +78,7 @@
       const inTopBar = !!el.closest('header, [class*="top"], [class*="navbar"], [class*="nav"]');
       if (!inTopBar) continue;
 
-      const targetPath = '/admin/updates';
+      const targetPath = '/admin/email-providers';
 
       if (el.tagName === 'A') {
         const a = el;
