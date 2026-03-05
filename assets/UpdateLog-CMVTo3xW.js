@@ -6,7 +6,6 @@ const updates = [
     title: "Sub-Admin Verwaltung",
     badge: "Neu",
     badgeClass: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
-    icon: "◻",
     summary:
       "Sie können jetzt weitere Admins mit eingeschränkten Rechten anlegen, damit Ihr Team mitarbeiten kann, ohne vollen Zugriff zu haben.",
     points: [
@@ -20,7 +19,6 @@ const updates = [
     title: "Mitarbeiter-Export",
     badge: "Neu",
     badgeClass: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
-    icon: "⤓",
     summary:
       "Laden Sie alle Daten Ihrer Mitarbeiter als ZIP-Datei herunter - inklusive Profil, KYC-Dokumente und hochgeladene Bankdokumente.",
     points: [
@@ -35,7 +33,6 @@ const updates = [
     title: "Neues Dashboard + Starter-Aufgaben Anzeige",
     badge: "Verbessert",
     badgeClass: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
-    icon: "⊞",
     summary:
       "Das Admin-Dashboard wurde neu gestaltet. Sie sehen jetzt sofort, welche neuen Mitarbeiter ihre Starter-Aufgaben noch nicht erledigt haben.",
     points: [
@@ -50,7 +47,6 @@ const updates = [
     title: "Automatische Auftragszuweisung",
     badge: "Neu",
     badgeClass: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
-    icon: "↻",
     summary:
       "Aufträge können jetzt nummeriert und automatisch der Reihe nach zugewiesen werden - Sie müssen nicht mehr jeden Auftrag von Hand zuweisen.",
     points: [
@@ -65,7 +61,6 @@ const updates = [
     title: "Caller-Dashboard",
     badge: "Neu",
     badgeClass: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
-    icon: "☎",
     summary:
       "Caller haben jetzt ein eigenes Dashboard, auf dem sie ihre Leistung sehen und schnell auf Bewerbungen zugreifen können.",
     points: [
@@ -79,7 +74,6 @@ const updates = [
     title: "SMS-Benachrichtigungen",
     badge: "Neu",
     badgeClass: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
-    icon: "✉",
     summary:
       "Mitarbeiter werden jetzt automatisch per SMS informiert, wenn etwas Wichtiges passiert - z.B. bei neuen Aufträgen, Genehmigungen oder Erinnerungen.",
     points: [
@@ -123,62 +117,59 @@ const UpdateLogPage = () =>
                   "div",
                   {
                     className: "relative pl-10",
-                children: [
-                  e.jsx("span", {
-                    className:
-                      "absolute left-[7px] top-2 h-3 w-3 rounded-full bg-gray-900 dark:bg-gray-200 border-2 border-white dark:border-gray-900",
-                  }),
-                  e.jsx("div", {
-                    className: "text-xs text-gray-500 dark:text-gray-400 mb-2",
-                    children: item.date,
-                  }),
-                  e.jsxs("section", {
-                    className:
-                      "rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm p-4",
                     children: [
-                      e.jsxs("div", {
-                        className: "flex items-center gap-3 mb-1",
+                      e.jsx("span", {
+                        className:
+                          "absolute left-[7px] top-2 h-3 w-3 rounded-full bg-gray-900 dark:bg-gray-200 border-2 border-white dark:border-gray-900",
+                      }),
+                      e.jsx("div", {
+                        className: "text-xs text-gray-500 dark:text-gray-400 mb-2",
+                        children: item.date,
+                      }),
+                      e.jsxs("section", {
+                        className:
+                          "rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm p-4",
                         children: [
-                          e.jsx("span", {
-                            className:
-                              "h-8 w-8 rounded-lg bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-300 inline-flex items-center justify-center text-sm",
-                            children: item.icon,
+                          e.jsxs("div", {
+                            className: "flex items-center gap-2 mb-1",
+                            children: [
+                              e.jsx("h2", {
+                                className: "text-2xl font-semibold text-gray-900 dark:text-white",
+                                children: item.title,
+                              }),
+                              e.jsx("span", {
+                                className:
+                                  "px-2 py-0.5 rounded-full text-xs font-medium " + item.badgeClass,
+                                children: item.badge,
+                              }),
+                            ],
                           }),
-                          e.jsx("h2", {
-                            className: "text-2xl font-semibold text-gray-900 dark:text-white",
-                            children: item.title,
+                          e.jsx("p", {
+                            className: "text-sm text-gray-700 dark:text-gray-300 mb-3",
+                            children: item.summary,
                           }),
-                          e.jsx("span", {
-                            className:
-                              "px-2 py-0.5 rounded-full text-xs font-medium " + item.badgeClass,
-                            children: item.badge,
+                          e.jsx("ul", {
+                            className: "space-y-1",
+                            children: item.points.map((point, i) =>
+                              e.jsxs(
+                                "li",
+                                {
+                                  className: "text-sm text-gray-700 dark:text-gray-300 leading-6",
+                                  children: ["• ", point],
+                                },
+                                i
+                              )
+                            ),
                           }),
                         ],
                       }),
-                      e.jsx("p", {
-                        className: "text-sm text-gray-700 dark:text-gray-300 mb-3",
-                        children: item.summary,
-                      }),
-                      e.jsx("ul", {
-                        className: "space-y-1",
-                        children: item.points.map((p, i) =>
-                          e.jsxs(
-                            "li",
-                            {
-                              className: "text-sm text-gray-700 dark:text-gray-300 leading-6",
-                              children: ["• ", p],
-                            },
-                            i
-                          )
-                        ),
-                      }),
                     ],
-                  }),
-                ],
-              },
-              idx
-            )
-          ),
+                  },
+                  idx
+                )
+              ),
+            }),
+          ],
         }),
       ],
     }),
