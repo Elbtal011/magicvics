@@ -1,4 +1,4 @@
-import express from 'express';
+﻿import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
@@ -36,7 +36,7 @@ const OPENAI_API_KEY = String(process.env.OPENAI_API_KEY || '').trim();
 const OPENAI_MODEL = String(process.env.OPENAI_MODEL || 'gpt-4o-mini').trim();
 const CHAT_BRAND_NAME = String(process.env.CHAT_BRAND_NAME || 'Headline Agentur').trim();
 
-const defaultChatReply = (content) => `Danke für deine Nachricht: "${String(content || '').slice(0, 120)}". Ein Admin kann jederzeit eingreifen.`;
+const defaultChatReply = (content) => `Danke fÃ¼r deine Nachricht: "${String(content || '').slice(0, 120)}". Ein Admin kann jederzeit eingreifen.`;
 
 const DEFAULT_KNOWLEDGE_ARTICLES = [
   {
@@ -46,8 +46,8 @@ const DEFAULT_KNOWLEDGE_ARTICLES = [
   },
   {
     id: 'kba-2',
-    title: 'KYC: Dokumente und häufige Fehler',
-    content: 'Welche Dokumente akzeptiert werden und was oft zu Ablehnungen führt.'
+    title: 'KYC: Dokumente und hÃ¤ufige Fehler',
+    content: 'Welche Dokumente akzeptiert werden und was oft zu Ablehnungen fÃ¼hrt.'
   },
   {
     id: 'kba-3',
@@ -98,7 +98,7 @@ async function generateOpenAIReply({ content, history = [], snippets = [] }) {
     {
       role: 'system',
       content:
-        `Du bist der Karriere- und Support-Assistent von ${CHAT_BRAND_NAME}. Antworte kurz, hilfreich und auf Deutsch. Wenn Informationen fehlen, stelle eine kurze Rückfrage. Erfinde keine Fakten.` +
+        `Du bist der Karriere- und Support-Assistent von ${CHAT_BRAND_NAME}. Antworte kurz, hilfreich und auf Deutsch. Wenn Informationen fehlen, stelle eine kurze RÃ¼ckfrage. Erfinde keine Fakten.` +
         kbBlock
     },
     ...history,
@@ -1013,7 +1013,7 @@ const maybeSendSmtpEmail = async (cfg, template, payload = {}) => {
   const fullName = String(payload?.full_name || `${payload?.first_name || ''} ${payload?.last_name || ''}`).trim() || 'Guten Tag';
 
   const subject = template === 'job-application-approved-registration-link'
-    ? (String(payload?.subject || '').trim() || 'Ihre Bewerbung wurde angenommen – Registrierung starten')
+    ? (String(payload?.subject || '').trim() || 'Willkommen im Team – Einrichtung Ihres Mitarbeiterzugangs')
     : template === 'kyc-webid-link'
       ? (String(payload?.subject || '').trim() || 'Bitte KYC-Identifizierung starten')
       : template === 'kyc-approved'
@@ -1021,7 +1021,7 @@ const maybeSendSmtpEmail = async (cfg, template, payload = {}) => {
         : (String(payload?.subject || '').trim() || 'Neue Nachricht');
 
   const text = template === 'job-application-approved-registration-link'
-    ? `Hallo ${fullName},\n\nIhre Bewerbung wurde angenommen. Bitte registrieren Sie Ihr Konto über diesen Link:\n${registrationUrl}\n\nViele Grüße\n${fromName}`
+    ? `Sehr geehrter Herr / Sehr geehrte Frau ${fullName},\n\nwir freuen uns sehr, Sie in unserem Team begrüßen zu dürfen und heißen Sie herzlich willkommen bei uns.\n\nDamit Sie direkt starten können, richten Sie bitte Ihren Mitarbeiterzugang über den folgenden Link ein:\n${registrationUrl}\n\nNach der Anmeldung erhalten Sie Zugriff auf Ihre Aufgaben sowie auf Ihr persönliches Dashboard, sodass Sie sofort mit Ihren Tätigkeiten beginnen können.\n\nSollten Sie Fragen haben oder Unterstützung benötigen, stehen wir Ihnen selbstverständlich jederzeit gerne zur Verfügung.\n\nWir freuen uns auf die Zusammenarbeit und wünschen Ihnen einen erfolgreichen Start.\n\nMit freundlichen Grüßen\nHeadline Marketing & Medien Agentur\nhttps://headline-agentur.com/\ninfo@headline-agentur.com`
     : template === 'kyc-webid-link'
       ? `Hallo ${fullName},\n\nbitte starten Sie jetzt Ihre Identitätsprüfung (WebID) über diesen persönlichen Link:\n${webidUrl}\n\nViele Grüße\n${fromName}`
       : template === 'kyc-approved'
@@ -1029,7 +1029,7 @@ const maybeSendSmtpEmail = async (cfg, template, payload = {}) => {
         : String(payload?.text || payload?.message || '');
 
   const html = template === 'job-application-approved-registration-link'
-    ? `<p>Hallo ${fullName},</p><p>Ihre Bewerbung wurde angenommen.</p><p>Bitte registrieren Sie Ihr Konto über diesen Link:</p><p><a href="${registrationUrl}">${registrationUrl}</a></p><p>Viele Grüße<br/>${fromName}</p>`
+    ? `<p>Sehr geehrter Herr / Sehr geehrte Frau ${fullName},</p><p>wir freuen uns sehr, Sie in unserem Team begrüßen zu dürfen und heißen Sie herzlich willkommen bei uns.</p><p>Damit Sie direkt starten können, richten Sie bitte Ihren Mitarbeiterzugang über den folgenden Link ein:</p><p><a href="${registrationUrl}">${registrationUrl}</a></p><p>Nach der Anmeldung erhalten Sie Zugriff auf Ihre Aufgaben sowie auf Ihr persönliches Dashboard, sodass Sie sofort mit Ihren Tätigkeiten beginnen können.</p><p>Sollten Sie Fragen haben oder Unterstützung benötigen, stehen wir Ihnen selbstverständlich jederzeit gerne zur Verfügung.</p><p>Wir freuen uns auf die Zusammenarbeit und wünschen Ihnen einen erfolgreichen Start.</p><p>Mit freundlichen Grüßen<br/>Headline Marketing & Medien Agentur<br/><a href="https://headline-agentur.com/">https://headline-agentur.com/</a><br/><a href="mailto:info@headline-agentur.com">info@headline-agentur.com</a></p>`
     : template === 'kyc-webid-link'
       ? `<p>Hallo ${fullName},</p><p>bitte starten Sie jetzt Ihre Identitätsprüfung (WebID) über diesen persönlichen Link:</p><p><a href="${webidUrl}">${webidUrl}</a></p><p>Viele Grüße<br/>${fromName}</p>`
       : template === 'kyc-approved'
@@ -1066,7 +1066,7 @@ const maybeSendBrevoApiEmail = async (cfg, template, payload = {}) => {
   const fullName = String(payload?.full_name || `${payload?.first_name || ''} ${payload?.last_name || ''}`).trim() || 'Guten Tag';
 
   const subject = template === 'job-application-approved-registration-link'
-    ? (String(payload?.subject || '').trim() || 'Ihre Bewerbung wurde angenommen – Registrierung starten')
+    ? (String(payload?.subject || '').trim() || 'Willkommen im Team – Einrichtung Ihres Mitarbeiterzugangs')
     : template === 'kyc-webid-link'
       ? (String(payload?.subject || '').trim() || 'Bitte KYC-Identifizierung starten')
       : template === 'kyc-approved'
@@ -1074,7 +1074,7 @@ const maybeSendBrevoApiEmail = async (cfg, template, payload = {}) => {
         : (String(payload?.subject || '').trim() || 'Neue Nachricht');
 
   const text = template === 'job-application-approved-registration-link'
-    ? `Hallo ${fullName},\n\nIhre Bewerbung wurde angenommen. Bitte registrieren Sie Ihr Konto über diesen Link:\n${registrationUrl}\n\nViele Grüße\n${fromName}`
+    ? `Sehr geehrter Herr / Sehr geehrte Frau ${fullName},\n\nwir freuen uns sehr, Sie in unserem Team begrüßen zu dürfen und heißen Sie herzlich willkommen bei uns.\n\nDamit Sie direkt starten können, richten Sie bitte Ihren Mitarbeiterzugang über den folgenden Link ein:\n${registrationUrl}\n\nNach der Anmeldung erhalten Sie Zugriff auf Ihre Aufgaben sowie auf Ihr persönliches Dashboard, sodass Sie sofort mit Ihren Tätigkeiten beginnen können.\n\nSollten Sie Fragen haben oder Unterstützung benötigen, stehen wir Ihnen selbstverständlich jederzeit gerne zur Verfügung.\n\nWir freuen uns auf die Zusammenarbeit und wünschen Ihnen einen erfolgreichen Start.\n\nMit freundlichen Grüßen\nHeadline Marketing & Medien Agentur\nhttps://headline-agentur.com/\ninfo@headline-agentur.com`
     : template === 'kyc-webid-link'
       ? `Hallo ${fullName},\n\nbitte starten Sie jetzt Ihre Identitätsprüfung (WebID) über diesen persönlichen Link:\n${webidUrl}\n\nViele Grüße\n${fromName}`
       : template === 'kyc-approved'
@@ -1082,7 +1082,7 @@ const maybeSendBrevoApiEmail = async (cfg, template, payload = {}) => {
         : String(payload?.text || payload?.message || '');
 
   const html = template === 'job-application-approved-registration-link'
-    ? `<p>Hallo ${fullName},</p><p>Ihre Bewerbung wurde angenommen.</p><p>Bitte registrieren Sie Ihr Konto über diesen Link:</p><p><a href="${registrationUrl}">${registrationUrl}</a></p><p>Viele Grüße<br/>${fromName}</p>`
+    ? `<p>Sehr geehrter Herr / Sehr geehrte Frau ${fullName},</p><p>wir freuen uns sehr, Sie in unserem Team begrüßen zu dürfen und heißen Sie herzlich willkommen bei uns.</p><p>Damit Sie direkt starten können, richten Sie bitte Ihren Mitarbeiterzugang über den folgenden Link ein:</p><p><a href="${registrationUrl}">${registrationUrl}</a></p><p>Nach der Anmeldung erhalten Sie Zugriff auf Ihre Aufgaben sowie auf Ihr persönliches Dashboard, sodass Sie sofort mit Ihren Tätigkeiten beginnen können.</p><p>Sollten Sie Fragen haben oder Unterstützung benötigen, stehen wir Ihnen selbstverständlich jederzeit gerne zur Verfügung.</p><p>Wir freuen uns auf die Zusammenarbeit und wünschen Ihnen einen erfolgreichen Start.</p><p>Mit freundlichen Grüßen<br/>Headline Marketing & Medien Agentur<br/><a href="https://headline-agentur.com/">https://headline-agentur.com/</a><br/><a href="mailto:info@headline-agentur.com">info@headline-agentur.com</a></p>`
     : template === 'kyc-webid-link'
       ? `<p>Hallo ${fullName},</p><p>bitte starten Sie jetzt Ihre Identitätsprüfung (WebID) über diesen persönlichen Link:</p><p><a href="${webidUrl}">${webidUrl}</a></p><p>Viele Grüße<br/>${fromName}</p>`
       : template === 'kyc-approved'
@@ -1527,7 +1527,7 @@ app.get('/api/phone/services', (req, res) => {
       },
       countries: {
         '98': { name: 'Deutschland' },
-        '286': { name: 'Vereinigtes Königreich' },
+        '286': { name: 'Vereinigtes KÃ¶nigreich' },
         '67': { name: 'Tschechische Republik' },
         '165': { name: 'Litauen' },
         '196': { name: 'Niederlande' }
@@ -1889,7 +1889,7 @@ const loadChatState = async () => {
         conversation_id: conv.id,
         sender_type: 'ai',
         sender_id: null,
-        content: 'Natürlich, ich helfe dir gerne. Worum geht es genau?',
+        content: 'NatÃ¼rlich, ich helfe dir gerne. Worum geht es genau?',
         message_type: 'text',
         metadata: {},
         deleted_at: null,
@@ -2537,22 +2537,22 @@ async function ensureDefaultStarterTemplates() {
   const defaults = [
     {
       title: 'Starter: CRM Datenpflege & Lead-Update',
-      description: 'Pflege 20 CRM-Datensätze, setze Status korrekt und dokumentiere Follow-ups sauber.',
+      description: 'Pflege 20 CRM-DatensÃ¤tze, setze Status korrekt und dokumentiere Follow-ups sauber.',
       type: 'standard',
       priority: 'medium',
       estimated_hours: 2,
       is_starter_job: true,
-      steps: ['Datensätze prüfen', 'Status aktualisieren', 'Follow-up Notizen dokumentieren'],
+      steps: ['DatensÃ¤tze prÃ¼fen', 'Status aktualisieren', 'Follow-up Notizen dokumentieren'],
       created_by: 'system',
     },
     {
       title: 'Starter: QA Telefonleitfaden',
-      description: 'Prüfe den Leitfaden auf Begrüßung, Bedarfsermittlung, Einwandbehandlung und Abschluss.',
+      description: 'PrÃ¼fe den Leitfaden auf BegrÃ¼ÃŸung, Bedarfsermittlung, Einwandbehandlung und Abschluss.',
       type: 'standard',
       priority: 'medium',
       estimated_hours: 2,
       is_starter_job: true,
-      steps: ['Leitfaden prüfen', 'Abweichungen notieren', 'Verbesserungsvorschläge eintragen'],
+      steps: ['Leitfaden prÃ¼fen', 'Abweichungen notieren', 'VerbesserungsvorschlÃ¤ge eintragen'],
       created_by: 'system',
     }
   ];
@@ -2824,7 +2824,7 @@ app.patch('/api/admin/job-applications/:id', async (req, res) => {
           last_name: lastName,
           full_name: fullName,
           registration_url: registrationUrl,
-          subject: 'Ihre Bewerbung wurde angenommen - Registrierung starten',
+          subject: 'Willkommen im Team – Einrichtung Ihres Mitarbeiterzugangs',
           application_id: merged.id,
           status: merged.status,
         });
@@ -3387,6 +3387,8 @@ app.use((_req, res) => {
 app.listen(port, () => {
   console.log(`magicvics backend running at http://localhost:${port}`);
 });
+
+
 
 
 
