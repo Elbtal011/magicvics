@@ -5,6 +5,8 @@ const updates = [
     date: "10. Februar 2026",
     title: "Sub-Admin Verwaltung",
     badge: "Neu",
+    badgeClass: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
+    icon: "◻",
     summary:
       "Sie können jetzt weitere Admins mit eingeschränkten Rechten anlegen, damit Ihr Team mitarbeiten kann, ohne vollen Zugriff zu haben.",
     points: [
@@ -17,6 +19,8 @@ const updates = [
     date: "08. Februar 2026",
     title: "Mitarbeiter-Export",
     badge: "Neu",
+    badgeClass: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
+    icon: "⤓",
     summary:
       "Laden Sie alle Daten Ihrer Mitarbeiter als ZIP-Datei herunter - inklusive Profil, KYC-Dokumente und hochgeladene Bankdokumente.",
     points: [
@@ -30,6 +34,8 @@ const updates = [
     date: "06. Februar 2026",
     title: "Neues Dashboard + Starter-Aufgaben Anzeige",
     badge: "Verbessert",
+    badgeClass: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
+    icon: "⊞",
     summary:
       "Das Admin-Dashboard wurde neu gestaltet. Sie sehen jetzt sofort, welche neuen Mitarbeiter ihre Starter-Aufgaben noch nicht erledigt haben.",
     points: [
@@ -43,6 +49,8 @@ const updates = [
     date: "04. Februar 2026",
     title: "Automatische Auftragszuweisung",
     badge: "Neu",
+    badgeClass: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
+    icon: "↻",
     summary:
       "Aufträge können jetzt nummeriert und automatisch der Reihe nach zugewiesen werden - Sie müssen nicht mehr jeden Auftrag von Hand zuweisen.",
     points: [
@@ -56,6 +64,8 @@ const updates = [
     date: "02. Februar 2026",
     title: "Caller-Dashboard",
     badge: "Neu",
+    badgeClass: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
+    icon: "☎",
     summary:
       "Caller haben jetzt ein eigenes Dashboard, auf dem sie ihre Leistung sehen und schnell auf Bewerbungen zugreifen können.",
     points: [
@@ -68,6 +78,8 @@ const updates = [
     date: "01. Februar 2026",
     title: "SMS-Benachrichtigungen",
     badge: "Neu",
+    badgeClass: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
+    icon: "✉",
     summary:
       "Mitarbeiter werden jetzt automatisch per SMS informiert, wenn etwas Wichtiges passiert - z.B. bei neuen Aufträgen, Genehmigungen oder Erinnerungen.",
     points: [
@@ -79,66 +91,66 @@ const updates = [
   },
 ];
 
-const badgeClass = (badge) =>
-  badge === "Verbessert"
-    ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300"
-    : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300";
-
 const UpdateLogPage = () =>
   e.jsx("div", {
     className: "w-full px-4 py-6",
     children: e.jsxs("div", {
-      className:
-        "bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden",
+      className: "max-w-4xl mx-auto",
       children: [
-        e.jsx("div", { className: "h-1 w-full bg-blue-600" }),
+        e.jsx("a", {
+          href: "/admin/dashboard",
+          className: "inline-block text-sm text-gray-500 dark:text-gray-400 mb-3 hover:underline",
+          children: "← Zurück",
+        }),
+        e.jsx("h1", {
+          className: "text-3xl font-semibold text-gray-900 dark:text-white",
+          children: "Update-Protokoll",
+        }),
+        e.jsx("p", {
+          className: "text-sm text-gray-600 dark:text-gray-300 mt-1 mb-8",
+          children: "Neueste Änderungen und Verbesserungen an MagicVics",
+        }),
         e.jsxs("div", {
-          className: "p-6",
+          className: "relative",
           children: [
-            e.jsxs("div", {
-              className: "flex items-center gap-3 mb-3",
-              children: [
-                e.jsx("a", {
-                  href: "/admin/dashboard",
-                  className:
-                    "inline-flex items-center px-3 py-1.5 text-sm rounded-md border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700",
-                  children: "Zurück",
-                }),
-                e.jsx("h1", {
-                  className: "text-2xl font-semibold text-gray-900 dark:text-white",
-                  children: "Update-Protokoll",
-                }),
-              ],
-            }),
-            e.jsx("p", {
-              className: "text-sm text-gray-600 dark:text-gray-300 mb-6",
-              children: "Neueste Änderungen und Verbesserungen an MagicVics",
+            e.jsx("div", {
+              className: "absolute left-3 top-0 bottom-0 w-px bg-gray-200 dark:bg-gray-700",
             }),
             e.jsx("div", {
-              className: "space-y-6",
-              children: updates.map((item) =>
+              className: "space-y-8",
+              children: updates.map((item, idx) =>
                 e.jsxs(
-                  "section",
+                  "div",
                   {
+                    className: "relative pl-10",
+                children: [
+                  e.jsx("span", {
                     className:
-                      "rounded-lg border border-gray-200 dark:border-gray-700 p-4 bg-gray-50/60 dark:bg-gray-900/20",
+                      "absolute left-[7px] top-2 h-3 w-3 rounded-full bg-gray-900 dark:bg-gray-200 border-2 border-white dark:border-gray-900",
+                  }),
+                  e.jsx("div", {
+                    className: "text-xs text-gray-500 dark:text-gray-400 mb-2",
+                    children: item.date,
+                  }),
+                  e.jsxs("section", {
+                    className:
+                      "rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm p-4",
                     children: [
-                      e.jsx("div", {
-                        className: "text-xs text-gray-500 dark:text-gray-400 mb-2",
-                        children: item.date,
-                      }),
                       e.jsxs("div", {
-                        className: "flex items-center gap-2 mb-2",
+                        className: "flex items-center gap-3 mb-1",
                         children: [
-                          e.jsx("h2", {
+                          e.jsx("span", {
                             className:
-                              "text-base font-semibold text-gray-900 dark:text-white",
+                              "h-8 w-8 rounded-lg bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-300 inline-flex items-center justify-center text-sm",
+                            children: item.icon,
+                          }),
+                          e.jsx("h2", {
+                            className: "text-2xl font-semibold text-gray-900 dark:text-white",
                             children: item.title,
                           }),
                           e.jsx("span", {
                             className:
-                              "px-2 py-0.5 rounded-full text-xs font-medium " +
-                              badgeClass(item.badge),
+                              "px-2 py-0.5 rounded-full text-xs font-medium " + item.badgeClass,
                             children: item.badge,
                           }),
                         ],
@@ -148,26 +160,25 @@ const UpdateLogPage = () =>
                         children: item.summary,
                       }),
                       e.jsx("ul", {
-                        className: "list-disc pl-5 space-y-1",
+                        className: "space-y-1",
                         children: item.points.map((p, i) =>
-                          e.jsx(
+                          e.jsxs(
                             "li",
                             {
-                              className:
-                                "text-sm text-gray-700 dark:text-gray-300 leading-6",
-                              children: p,
+                              className: "text-sm text-gray-700 dark:text-gray-300 leading-6",
+                              children: ["• ", p],
                             },
                             i
                           )
                         ),
                       }),
                     ],
-                  },
-                  item.date + item.title
-                )
-              ),
-            }),
-          ],
+                  }),
+                ],
+              },
+              idx
+            )
+          ),
         }),
       ],
     }),
