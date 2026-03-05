@@ -120,7 +120,7 @@ const UpdateLogPage = () =>
                     children: [
                       e.jsx("span", {
                         className:
-                          "absolute left-[7px] top-2 h-3 w-3 rounded-full bg-gray-900 dark:bg-gray-200 border-2 border-white dark:border-gray-900",
+                          "absolute left-3 -translate-x-1/2 top-2 h-3 w-3 rounded-full bg-gray-900 dark:bg-gray-200 border-2 border-white dark:border-gray-900",
                       }),
                       e.jsx("div", {
                         className: "text-xs text-gray-500 dark:text-gray-400 mb-2",
