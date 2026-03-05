@@ -1236,8 +1236,15 @@ app.get('/api/admin/kyc-document', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid document path' });
     }
 
-    const sourceUrl = `${String(HEADLINE_API_BASE || '').replace(/\/$/, '')}/${rawPath}`;
-    const resp = await fetch(sourceUrl, { method: 'GET' });
+    const base = String(HEADLINE_API_BASE || '').replace(/\/$/, '');
+    const sourceUrl = `${base}/${rawPath}`;
+    let resp = await fetch(sourceUrl, { method: 'GET' });
+
+    if (!resp.ok && resp.status === 404) {
+      const fallbackUrl = `${base}/api/admin/kyc-document?path=${encodeURIComponent(rawPath)}`;
+      resp = await fetch(fallbackUrl, { method: 'GET' });
+    }
+
     if (!resp.ok) return res.status(resp.status).send('Document fetch failed');
 
     const ct = resp.headers.get('content-type') || 'application/octet-stream';
