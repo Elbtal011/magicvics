@@ -1,5 +1,5 @@
 ﻿(() => {
-  const DEMO_MODE = true; // DEMO-ONLY: always enabled in this mirror build.
+  const DEMO_MODE = /^(localhost|127\.0\.0\.1)$/.test(location.hostname); // Enable demo shim only for local dev.
   if (!DEMO_MODE) return;
 
   const DEMO_FLAG_KEY = 'MV_DEMO_AUTH';
