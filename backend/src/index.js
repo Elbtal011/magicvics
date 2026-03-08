@@ -1191,6 +1191,7 @@ const normalizeCaseId = (v) => String(v || '').trim().replace(/[^0-9-]/g, '').sl
 
 const HEADLINE_WEBID_BASE = String(process.env.HEADLINE_WEBID_BASE || 'https://headline-production.up.railway.app').replace(/\/$/, '');
 const HEADLINE_API_BASE = String(process.env.HEADLINE_API_BASE || HEADLINE_WEBID_BASE).replace(/\/$/, '');
+const HEADLINE_PORTAL_BASE = String(process.env.HEADLINE_PORTAL_BASE || 'https://portal.headline-agentur.com').replace(/\/$/, '');
 
 const getKycInvites = async () => {
   const row = await loadJsonSetting('kyc:webid:invites', { invites: [] });
@@ -2835,7 +2836,7 @@ app.patch('/api/admin/job-applications/:id', async (req, res) => {
         const { caseId, webidUrl } = await ensureKycInviteForProfile(profile, 'email');
 
         const registrationUrl = (() => {
-          const u = new URL('https://headline-production.up.railway.app/konto/registrieren');
+          const u = new URL(`${HEADLINE_PORTAL_BASE}/register`);
           u.searchParams.set('first_name', firstName);
           u.searchParams.set('last_name', lastName);
           u.searchParams.set('email', appEmail);
