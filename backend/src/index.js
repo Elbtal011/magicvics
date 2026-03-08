@@ -3860,7 +3860,8 @@ app.post('/api/public/user-task-assignments/:id/accept', async (req, res) => {
 
     const currentStatus = String(current.status || '').toLowerCase();
     const nextStatus = (currentStatus === 'pending' || currentStatus === 'open') ? 'accepted' : currentStatus;
-    const updated = normalizeTaskAssignment({ ...current, status: nextStatus, updated_at: nowIso() });
+    const nextStep = Number(current.current_step || 0) <= 0 ? 1 : Number(current.current_step || 0);
+    const updated = normalizeTaskAssignment({ ...current, status: nextStatus, current_step: nextStep, updated_at: nowIso() });
     assignments[idx] = updated;
     await saveTaskAssignments(assignments);
 
