@@ -14,7 +14,7 @@
 
     const style = document.createElement('style');
     style.textContent = `
-    .chat-launcher{position:fixed;right:18px;bottom:18px;width:58px;height:58px;border:0;border-radius:999px;background:linear-gradient(140deg,#0a4b98,#1b78d9);color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 12px 28px rgba(15,59,113,.35);z-index:1100;cursor:pointer}
+    .chat-launcher{position:fixed;right:18px;bottom:18px;width:58px;height:58px;border:0;border-radius:999px;background:linear-gradient(140deg,#0a4b98,#1b78d9);color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 12px 28px rgba(15,59,113,.35);z-index:1100;cursor:pointer;font-size:26px;line-height:1}
     .chat-panel{position:fixed;right:18px;bottom:88px;width:min(420px,calc(100vw - 22px));max-height:min(72vh,700px);background:#fff;border:1px solid #d8e3f0;border-radius:14px;box-shadow:0 16px 40px rgba(12,40,76,.22);overflow:hidden;display:none;z-index:1100}
     .chat-panel.open{display:flex;flex-direction:column}
     .chat-head{background:#0f4f9f;color:#fff;padding:12px 14px;display:flex;align-items:center;justify-content:space-between;gap:8px}
