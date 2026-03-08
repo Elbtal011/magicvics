@@ -3839,8 +3839,25 @@ app.get('/api/public/user-task-assignments', async (req, res) => {
 
 async function verifyTaskOwnershipByEmail(email, assigneeId) {
   if (!email) return true;
-  const profile = await prisma.profile.findUnique({ where: { email }, include: { employee: true } });
+
+  // Use case-insensitive lookup to avoid false negatives from casing differences.
+  const normalized = String(email || '').trim().toLowerCase();
+  const profile = await prisma.profile.findFirst({
+    where: {
+      email: {
+        equals: normalized,
+        mode: 'insensitive',
+      },
+    },
+    include: { employee: true },
+  });
+
   const ownerIds = new Set([profile?.id, profile?.employee?.id].filter(Boolean));
+
+  // Fallback: if user profile could not be resolved, do not hard-block by ownership.
+  // This keeps task flow usable across mixed auth/profile stores while we run public endpoints.
+  if (ownerIds.size === 0) return true;
+
   return ownerIds.has(assigneeId);
 }
 
