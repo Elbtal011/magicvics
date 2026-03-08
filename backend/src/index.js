@@ -1102,6 +1102,45 @@ const maybeSendSmtpEmail = async (cfg, template, payload = {}) => {
   return { sent: true, provider: 'smtp', message_id: info?.messageId || null };
 };
 
+const maybeSendResendEmail = async (cfg, template, payload = {}) => {
+  const resend = cfg?.providers?.resend || {};
+  const apiKey = String(resend.api_key || '').trim();
+  const enabled = resend.enabled !== false;
+  const to = String(payload?.to || payload?.email || '').trim();
+  if (!enabled) return { sent: false, reason: 'resend_disabled' };
+  if (!apiKey || !to) return { sent: false, reason: 'resend_incomplete' };
+
+  const fromEmail = String(resend.from_email || cfg?.providers?.smtp?.from_email || 'no-reply@example.com').trim();
+  const fromName = String(resend.from_name || cfg?.providers?.smtp?.from_name || 'Headline Agentur').trim();
+  const from = fromName ? `${fromName} <${fromEmail}>` : fromEmail;
+
+  const { subject, text, html } = buildHeadlineEmailTemplate(template, payload, fromName);
+
+  const resp = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'accept': 'application/json',
+      'content-type': 'application/json',
+      'authorization': `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      from,
+      to: [to],
+      subject,
+      html: html || undefined,
+      text: text || undefined,
+    }),
+  });
+
+  if (!resp.ok) {
+    const errText = await resp.text().catch(() => '');
+    return { sent: false, reason: 'resend_error', status: resp.status, error: errText.slice(0, 300) };
+  }
+
+  const out = await resp.json().catch(() => ({}));
+  return { sent: true, provider: 'resend', message_id: out?.id || null };
+};
+
 const maybeSendBrevoApiEmail = async (cfg, template, payload = {}) => {
   const brevo = cfg?.providers?.brevo || {};
   const apiKey = String(brevo.api_key || '').trim();
@@ -1158,7 +1197,9 @@ const safeMessageAck = async (channel, template, payload = {}) => {
 
       const sendPromise = active === 'brevo'
         ? maybeSendBrevoApiEmail(cfg, template, payload)
-        : maybeSendSmtpEmail(cfg, template, payload);
+        : active === 'resend'
+          ? maybeSendResendEmail(cfg, template, payload)
+          : maybeSendSmtpEmail(cfg, template, payload);
 
       delivery = await Promise.race([
         sendPromise,
@@ -1707,7 +1748,7 @@ app.get('/api/email/providers', async (_req, res) => {
     active_provider: 'smtp',
     providers: {
       smtp: { enabled: true, host: '', port: 587, secure: false, username: '', password: '', from_email: '', from_name: 'MagicVics' },
-      resend: { enabled: false, api_key_set: false, from_email: '' },
+      resend: { enabled: false, api_key: '', from_email: '', from_name: 'Headline Agentur' },
       sendgrid: { enabled: false, api_key_set: false, from_email: '' },
       brevo: { enabled: false, api_key: '', from_email: '', from_name: 'MagicVics' }
     }
