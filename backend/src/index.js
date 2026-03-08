@@ -1825,17 +1825,19 @@ app.get('/api/admin/email-providers', async (_req, res) => {
   });
 });
 
-app.post('/api/admin/email-providers', async (req, res) => {
+async function saveAdminEmailProvider(req, res) {
   const body = req.body || {};
   const current = await getSettingJson('email:providers', { active_provider: 'smtp', providers: {} });
   const providers = { ...(current.providers || {}) };
 
-  // Infer target provider from payload (fallback to resend for api type)
-  const providerKey = String(body.provider_key || body.provider || (String(body.provider_type || '').toLowerCase().includes('smtp') ? 'smtp' : 'resend')).toLowerCase();
+  const providerKey = String(
+    body.provider_key
+      || body.provider
+      || body.type
+      || (String(body.provider_type || '').toLowerCase().includes('smtp') ? 'smtp' : 'resend')
+  ).toLowerCase();
 
-  if (!providers[providerKey]) {
-    providers[providerKey] = { enabled: true };
-  }
+  if (!providers[providerKey]) providers[providerKey] = { enabled: true };
 
   providers[providerKey] = {
     ...providers[providerKey],
@@ -1863,7 +1865,17 @@ app.post('/api/admin/email-providers', async (req, res) => {
   };
 
   await putSettingJson('email:providers', next);
-  res.json({ success: true, message: 'Email provider saved', data: next });
+  return res.json({ success: true, status: 'success', message: 'Email provider saved', data: next });
+}
+
+app.post('/api/admin/email-providers', saveAdminEmailProvider);
+app.put('/api/admin/email-providers', saveAdminEmailProvider);
+app.patch('/api/admin/email-providers', saveAdminEmailProvider);
+app.put('/api/admin/email-providers/:id', saveAdminEmailProvider);
+app.patch('/api/admin/email-providers/:id', saveAdminEmailProvider);
+
+app.post('/api/admin/email-providers/test', async (_req, res) => {
+  return res.json({ success: true, status: 'success', message: 'Provider test endpoint reachable' });
 });
 
 app.get('/api/telegram/settings', async (_req, res) => {
