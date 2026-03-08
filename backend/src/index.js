@@ -3414,22 +3414,38 @@ const TASK_ASSIGNMENTS_KEY = 'task_assignments_v1';
 const TASK_RATINGS_KEY = 'task_ratings_v1';
 const PAYOUT_REQUESTS_KEY = 'payout_requests_v1';
 
-const normalizeTaskTemplate = (row = {}) => ({
-  id: row.id || `tt_${Math.random().toString(36).slice(2, 10)}`,
-  title: String(row.title || '').trim(),
-  description: String(row.description || '').trim(),
-  type: String(row.type || 'standard').trim(),
-  priority: String(row.priority || 'medium').toLowerCase(),
-  estimated_hours: Number(row.estimated_hours ?? row.estimatedHours ?? 1) || 1,
-  is_starter_job: Boolean(row.is_starter_job),
-  order_number: row.is_starter_job ? null : (row.order_number ?? null),
-  required_attachments: Array.isArray(row.required_attachments) ? row.required_attachments : [],
-  steps: Array.isArray(row.steps) ? row.steps : [],
-  payment_amount: row.payment_amount ?? null,
-  created_by: row.created_by || null,
-  created_at: row.created_at || nowIso(),
-  updated_at: nowIso()
-});
+const normalizeTaskTemplate = (row = {}) => {
+  const rawSteps = Array.isArray(row.steps) ? row.steps : [];
+  const normalizedSteps = rawSteps
+    .map((step, idx) => {
+      if (typeof step === 'string') {
+        const text = String(step || '').trim();
+        if (!text) return null;
+        return { title: `Schritt ${idx + 1}`, description: text };
+      }
+      const title = String(step?.title || `Schritt ${idx + 1}`).trim();
+      const description = String(step?.description || step?.content || '').trim();
+      return { title, description };
+    })
+    .filter(Boolean);
+
+  return {
+    id: row.id || `tt_${Math.random().toString(36).slice(2, 10)}`,
+    title: String(row.title || '').trim(),
+    description: String(row.description || '').trim(),
+    type: String(row.type || 'standard').trim(),
+    priority: String(row.priority || 'medium').toLowerCase(),
+    estimated_hours: Number(row.estimated_hours ?? row.estimatedHours ?? 1) || 1,
+    is_starter_job: Boolean(row.is_starter_job),
+    order_number: row.is_starter_job ? null : (row.order_number ?? null),
+    required_attachments: Array.isArray(row.required_attachments) ? row.required_attachments : [],
+    steps: normalizedSteps,
+    payment_amount: row.payment_amount ?? null,
+    created_by: row.created_by || null,
+    created_at: row.created_at || nowIso(),
+    updated_at: nowIso()
+  };
+};
 
 const normalizeTaskAssignment = (row = {}) => ({
   id: row.id || `asg_${Math.random().toString(36).slice(2, 10)}`,
