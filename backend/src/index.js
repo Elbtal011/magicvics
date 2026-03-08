@@ -3844,6 +3844,53 @@ async function verifyTaskOwnershipByEmail(email, assigneeId) {
   return ownerIds.has(assigneeId);
 }
 
+app.get('/api/public/user-task-assignments/:id', async (req, res) => {
+  try {
+    const assignmentId = String(req.params.id || '').trim();
+    const email = String(req.query?.email || req.body?.email || '').trim().toLowerCase();
+    if (!assignmentId) return res.status(400).json({ success: false, message: 'assignment id is required' });
+
+    const [assignments, templates] = await Promise.all([getTaskAssignments(), getTaskTemplates()]);
+    const found = assignments.find((a) => a.id === assignmentId);
+    if (!found) return res.status(404).json({ success: false, message: 'Task assignment not found' });
+
+    const owns = await verifyTaskOwnershipByEmail(email, found.assignee_id);
+    if (!owns) return res.status(403).json({ success: false, message: 'Assignment does not belong to user' });
+
+    const tpl = templates.find((t) => t.id === found.task_template_id) || null;
+    return res.json({ success: true, data: { ...found, task_template: tpl || null, template_title: tpl?.title || null, template_description: tpl?.description || null } });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to fetch task assignment', error: String(error) });
+  }
+});
+
+app.post('/api/public/user-task-assignments/:id/step', async (req, res) => {
+  try {
+    const assignmentId = String(req.params.id || '').trim();
+    const email = String(req.body?.email || req.query?.email || '').trim().toLowerCase();
+    const step = Number(req.body?.current_step);
+
+    if (!assignmentId) return res.status(400).json({ success: false, message: 'assignment id is required' });
+    if (!Number.isFinite(step) || step < 0) return res.status(400).json({ success: false, message: 'current_step must be >= 0' });
+
+    const assignments = await getTaskAssignments();
+    const idx = assignments.findIndex((a) => a.id === assignmentId);
+    if (idx < 0) return res.status(404).json({ success: false, message: 'Task assignment not found' });
+
+    const current = assignments[idx];
+    const owns = await verifyTaskOwnershipByEmail(email, current.assignee_id);
+    if (!owns) return res.status(403).json({ success: false, message: 'Assignment does not belong to user' });
+
+    const updated = normalizeTaskAssignment({ ...current, current_step: step, status: step > 0 && String(current.status||'').toLowerCase()==='pending' ? 'accepted' : current.status, updated_at: nowIso() });
+    assignments[idx] = updated;
+    await saveTaskAssignments(assignments);
+
+    return res.json({ success: true, data: updated });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Failed to update task step', error: String(error) });
+  }
+});
+
 app.post('/api/public/user-task-assignments/:id/accept', async (req, res) => {
   try {
     const assignmentId = String(req.params.id || '').trim();
