@@ -2561,48 +2561,73 @@ app.delete('/api/admin/chat/conversations/:id', async (req, res) => {
 
 // User chat endpoints for demo compatibility
 app.post('/api/chat/conversations', async (req, res) => {
-  const state = await loadChatState();
+  try {
+    const state = await loadChatState();
 
-  const title = (req.body?.title || 'Projektleitung Chat').toString().trim();
-  const conversationType = (req.body?.conversationType || req.body?.conversation_type || 'general').toString();
-  const taskAssignmentId = (req.body?.taskAssignmentId || req.body?.task_assignment_id || '').toString().trim() || null;
-  const userId = (req.body?.user_id || req.body?.userId || '').toString().trim() || null;
+    const title = (req.body?.title || 'Projektleitung Chat').toString().trim();
+    const conversationType = (req.body?.conversationType || req.body?.conversation_type || 'general').toString();
+    const taskAssignmentId = (req.body?.taskAssignmentId || req.body?.task_assignment_id || '').toString().trim() || null;
+    const userId = (req.body?.user_id || req.body?.userId || '').toString().trim() || null;
 
-  let existing = null;
-  if (taskAssignmentId) {
-    existing = state.conversations.find(
-      (c) => !c.deleted_at && c.task_assignment_id === taskAssignmentId && (userId ? c.created_by === userId : true)
-    );
-  } else {
-    // Compatibility: widget may repeatedly call createConversation without taskAssignmentId.
-    // Reuse latest open conversation for the same user + type instead of creating duplicates.
-    const candidates = state.conversations
-      .filter((c) => !c.deleted_at && c.conversation_type === conversationType && (userId ? c.created_by === userId : true))
-      .sort((a, b) => new Date(b.updated_at || b.created_at).getTime() - new Date(a.updated_at || a.created_at).getTime());
-    existing = candidates[0] || null;
+    const conversations = Array.isArray(state?.conversations) ? state.conversations : [];
+
+    let existing = null;
+    if (taskAssignmentId) {
+      existing = conversations.find(
+        (c) => !c.deleted_at && c.task_assignment_id === taskAssignmentId && (userId ? c.created_by === userId : true)
+      );
+    } else {
+      // Compatibility: widget may repeatedly call createConversation without taskAssignmentId.
+      // Reuse latest open conversation for the same user + type instead of creating duplicates.
+      const candidates = conversations
+        .filter((c) => !c.deleted_at && c.conversation_type === conversationType && (userId ? c.created_by === userId : true))
+        .sort((a, b) => new Date(b.updated_at || b.created_at).getTime() - new Date(a.updated_at || a.created_at).getTime());
+      existing = candidates[0] || null;
+    }
+
+    if (existing) {
+      return res.json({ success: true, conversation: existing, isExisting: true });
+    }
+
+    const now = nowIso();
+    const created = {
+      id: makeId('conv'),
+      created_by: userId,
+      conversation_type: conversationType,
+      task_assignment_id: taskAssignmentId,
+      title,
+      archived_at: null,
+      deleted_at: null,
+      created_at: now,
+      updated_at: now
+    };
+
+    const nextState = {
+      ...(state && typeof state === 'object' ? state : {}),
+      conversations: [created, ...conversations],
+      messages: Array.isArray(state?.messages) ? state.messages : []
+    };
+
+    await saveChatState(nextState);
+
+    return res.json({ success: true, conversation: created, isExisting: false });
+  } catch (err) {
+    console.error('[chat] create conversation failed:', err?.message || err);
+    const now = nowIso();
+    const title = (req.body?.title || 'Projektleitung Chat').toString().trim();
+    const fallback = {
+      id: makeId('conv'),
+      created_by: (req.body?.user_id || req.body?.userId || '').toString().trim() || null,
+      conversation_type: (req.body?.conversationType || req.body?.conversation_type || 'general').toString(),
+      task_assignment_id: (req.body?.taskAssignmentId || req.body?.task_assignment_id || '').toString().trim() || null,
+      title,
+      archived_at: null,
+      deleted_at: null,
+      created_at: now,
+      updated_at: now
+    };
+    return res.status(200).json({ success: true, conversation: fallback, isExisting: false, degraded: true });
   }
-
-  if (existing) {
-    return res.json({ success: true, conversation: existing, isExisting: true });
-  }
-
-  const now = nowIso();
-  const created = {
-    id: makeId('conv'),
-    created_by: userId,
-    conversation_type: conversationType,
-    task_assignment_id: taskAssignmentId,
-    title,
-    archived_at: null,
-    deleted_at: null,
-    created_at: now,
-    updated_at: now
-  };
-
-  state.conversations.unshift(created);
-  await saveChatState(state);
-
-  return res.json({ success: true, conversation: created, isExisting: false });
 });
 
 app.get('/api/chat/conversations', async (req, res) => {
@@ -2616,12 +2641,18 @@ app.get('/api/chat/conversations', async (req, res) => {
 });
 
 app.get('/api/chat/conversations/:id/messages', async (req, res) => {
-  const state = await loadChatState();
-  const rows = state.messages
-    .filter((m) => m.conversation_id === req.params.id && !m.deleted_at)
-    .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-  const { data, pagination } = paginate(rows, req.query.page, req.query.limit || 200);
-  res.json({ success: true, messages: data, pagination });
+  try {
+    const state = await loadChatState();
+    const messages = Array.isArray(state?.messages) ? state.messages : [];
+    const rows = messages
+      .filter((m) => m.conversation_id === req.params.id && !m.deleted_at)
+      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    const { data, pagination } = paginate(rows, req.query.page, req.query.limit || 200);
+    res.json({ success: true, messages: data, pagination });
+  } catch (err) {
+    console.error('[chat] load messages failed:', err?.message || err);
+    res.json({ success: true, messages: [], pagination: { page: 1, limit: 200, total: 0, totalPages: 0 } });
+  }
 });
 
 app.post(['/api/chat', '/api/chat/messages', '/api/chat/conversations/:id/messages'], async (req, res) => {
