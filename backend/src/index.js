@@ -359,7 +359,16 @@ app.post('/api/employees', async (req, res) => {
       return employee;
     });
 
-    res.status(201).json({ success: true, data: serializeEmployee(created) });
+    let starterTasks = null;
+    if (String(created?.profile?.role || '').toLowerCase() === 'user') {
+      try {
+        starterTasks = await assignStarterTasksToProfile(created.profileId, 'registration_auto');
+      } catch (err) {
+        console.error('[starter-tasks] auto-assign failed after /api/employees create:', err?.message || err);
+      }
+    }
+
+    res.status(201).json({ success: true, data: serializeEmployee(created), starter_tasks: starterTasks });
   } catch (error) {
     if (String(error).includes('Unique constraint')) {
       return res.status(409).json({ success: false, message: 'email already exists' });
@@ -874,7 +883,16 @@ app.post('/api/admin/users', async (req, res) => {
       return tx.profile.findUnique({ where: { id: profile.id }, include: { employee: true } });
     });
 
-    res.status(201).json({ user: serializeAdminUser(created) });
+    let starterTasks = null;
+    if (created?.role === 'user') {
+      try {
+        starterTasks = await assignStarterTasksToProfile(created.id, 'registration_auto');
+      } catch (err) {
+        console.error('[starter-tasks] auto-assign failed after /api/admin/users create:', err?.message || err);
+      }
+    }
+
+    res.status(201).json({ user: serializeAdminUser(created), starter_tasks: starterTasks });
   } catch (error) {
     if (String(error).includes('Unique constraint')) {
       return res.status(409).json({ error: 'email already exists' });
