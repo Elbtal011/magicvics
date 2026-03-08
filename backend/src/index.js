@@ -3015,15 +3015,20 @@ async function assignStarterTasksToProfile(profileId, createdBy = 'kyc_approved_
   if (!assigneeId) return { assigned_count: 0, assignment_ids: [] };
 
   const [allTemplates, currentAssignments] = await Promise.all([ensureDefaultStarterTemplates(), getTaskAssignments()]);
-  const starterTemplates = allTemplates
-    .filter((t) => Boolean(t.is_starter_job))
+  const orderedTemplates = allTemplates
+    .slice()
     .sort((a, b) => {
       const ao = Number.isFinite(Number(a.order_number)) ? Number(a.order_number) : Number.MAX_SAFE_INTEGER;
       const bo = Number.isFinite(Number(b.order_number)) ? Number(b.order_number) : Number.MAX_SAFE_INTEGER;
       if (ao !== bo) return ao - bo;
       return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
-    })
-    .slice(0, 2);
+    });
+
+  let starterTemplates = orderedTemplates.filter((t) => Boolean(t.is_starter_job)).slice(0, 2);
+  // Fallback: if no starter flag is set in admin templates, use first 2 available templates.
+  if (starterTemplates.length === 0) {
+    starterTemplates = orderedTemplates.slice(0, 2);
+  }
   if (starterTemplates.length === 0) return { assigned_count: 0, assignment_ids: [] };
 
   const dueDate = new Date(Date.now() + (7 * 24 * 60 * 60 * 1000)).toISOString();
