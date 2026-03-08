@@ -1,15 +1,19 @@
 (function initPortalMitarbeiterChatWidget() {
-  const path = window.location.pathname || '';
-  if (!path.startsWith('/mitarbeiter')) return;
-
   const API_BASE = 'https://backend-production-4c3c.up.railway.app';
   const STORAGE_KEY = 'mv_guest_chat_v1';
   const USER_KEY = 'mv_guest_user_v1';
 
-  if (document.getElementById('chat-launcher')) return;
+  let mounted = false;
 
-  const style = document.createElement('style');
-  style.textContent = `
+  function mountIfNeeded() {
+    const path = window.location.pathname || '';
+    if (!path.startsWith('/mitarbeiter')) return;
+    if (mounted || document.getElementById('chat-launcher')) return;
+
+    mounted = true;
+
+    const style = document.createElement('style');
+    style.textContent = `
     .chat-launcher{position:fixed;right:18px;bottom:18px;width:58px;height:58px;border:0;border-radius:999px;background:linear-gradient(140deg,#0a4b98,#1b78d9);color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 12px 28px rgba(15,59,113,.35);z-index:1100;cursor:pointer}
     .chat-panel{position:fixed;right:18px;bottom:88px;width:min(420px,calc(100vw - 22px));max-height:min(72vh,700px);background:#fff;border:1px solid #d8e3f0;border-radius:14px;box-shadow:0 16px 40px rgba(12,40,76,.22);overflow:hidden;display:none;z-index:1100}
     .chat-panel.open{display:flex;flex-direction:column}
@@ -174,4 +178,21 @@
   });
   closeBtn.addEventListener('click', closePanel);
   form.addEventListener('submit', sendMessage);
+  }
+
+  // Initial check + SPA route-change hooks
+  mountIfNeeded();
+  window.addEventListener('popstate', mountIfNeeded);
+  const _pushState = history.pushState;
+  history.pushState = function () {
+    const ret = _pushState.apply(this, arguments);
+    setTimeout(mountIfNeeded, 0);
+    return ret;
+  };
+  const _replaceState = history.replaceState;
+  history.replaceState = function () {
+    const ret = _replaceState.apply(this, arguments);
+    setTimeout(mountIfNeeded, 0);
+    return ret;
+  };
 })();
