@@ -2982,32 +2982,9 @@ async function ensureDefaultStarterTemplates() {
     return normalizedExisting;
   }
 
-  const defaults = [
-    {
-      title: 'Starter: CRM Datenpflege & Lead-Update',
-      description: 'Pflege 20 CRM-DatensÃ¤tze, setze Status korrekt und dokumentiere Follow-ups sauber.',
-      type: 'standard',
-      priority: 'medium',
-      estimated_hours: 168,
-      is_starter_job: true,
-      steps: ['DatensÃ¤tze prÃ¼fen', 'Status aktualisieren', 'Follow-up Notizen dokumentieren'],
-      created_by: 'system',
-    },
-    {
-      title: 'Starter: QA Telefonleitfaden',
-      description: 'PrÃ¼fe den Leitfaden auf BegrÃ¼ÃŸung, Bedarfsermittlung, Einwandbehandlung und Abschluss.',
-      type: 'standard',
-      priority: 'medium',
-      estimated_hours: 168,
-      is_starter_job: true,
-      steps: ['Leitfaden prÃ¼fen', 'Abweichungen notieren', 'VerbesserungsvorschlÃ¤ge eintragen'],
-      created_by: 'system',
-    }
-  ];
-
-  const next = [...templates, ...defaults.map(normalizeTaskTemplate)];
-  await saveTaskTemplates(next);
-  return next;
+  // Do not inject synthetic defaults.
+  // Starter assignment must use templates managed in Admin backend task list.
+  return templates;
 }
 
 async function assignStarterTasksToProfile(profileId, createdBy = 'kyc_approved_auto') {
@@ -3024,12 +3001,10 @@ async function assignStarterTasksToProfile(profileId, createdBy = 'kyc_approved_
       return new Date(a.created_at || 0).getTime() - new Date(b.created_at || 0).getTime();
     });
 
-  let starterTemplates = orderedTemplates.filter((t) => Boolean(t.is_starter_job)).slice(0, 2);
-  // Fallback: if no starter flag is set in admin templates, use first 2 available templates.
+  const starterTemplates = orderedTemplates.filter((t) => Boolean(t.is_starter_job)).slice(0, 2);
   if (starterTemplates.length === 0) {
-    starterTemplates = orderedTemplates.slice(0, 2);
+    return { assigned_count: 0, assignment_ids: [], reason: 'No starter templates flagged in admin task list' };
   }
-  if (starterTemplates.length === 0) return { assigned_count: 0, assignment_ids: [] };
 
   const dueDate = new Date(Date.now() + (7 * 24 * 60 * 60 * 1000)).toISOString();
   const nextAssignments = [...currentAssignments];
