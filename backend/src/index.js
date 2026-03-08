@@ -2108,11 +2108,31 @@ const parseTimeframeMs = (timeframe) => {
   return 24 * 60 * 60 * 1000;
 };
 
+const chatStateFallbackMemory = { value: null };
+
 const loadJsonSetting = async (key, fallback) => {
-  const row = await prisma.setting.findUnique({ where: { key } });
-  return row?.value ?? fallback;
+  try {
+    const row = await prisma.setting.findUnique({ where: { key } });
+    return row?.value ?? fallback;
+  } catch (err) {
+    console.error(`[settings] load failed for key=${key}:`, err?.message || err);
+    if (key === 'chat:state' && chatStateFallbackMemory.value) return chatStateFallbackMemory.value;
+    return fallback;
+  }
 };
-const saveJsonSetting = async (key, value) => putSettingJson(key, value);
+
+const saveJsonSetting = async (key, value) => {
+  try {
+    await putSettingJson(key, value);
+  } catch (err) {
+    console.error(`[settings] save failed for key=${key}:`, err?.message || err);
+    if (key === 'chat:state') {
+      chatStateFallbackMemory.value = value;
+      return;
+    }
+    throw err;
+  }
+};
 
 const aiAgentsDefault = () => ({
   settings: {
@@ -2177,7 +2197,14 @@ const loadChatState = async () => {
   const state = await loadJsonSetting('chat:state', null);
   if (state && Array.isArray(state.conversations) && Array.isArray(state.messages)) return state;
 
-  const employees = await prisma.employee.findMany({ include: { profile: true }, orderBy: { createdAt: 'asc' }, take: 3 });
+  let employees = [];
+  try {
+    employees = await prisma.employee.findMany({ include: { profile: true }, orderBy: { createdAt: 'asc' }, take: 3 });
+  } catch (err) {
+    console.error('[chat] failed to load employees for seed state:', err?.message || err);
+    employees = [];
+  }
+
   const conversations = employees.map((e, idx) => {
     const createdAt = new Date(Date.now() - (idx + 1) * 2 * 60 * 60 * 1000).toISOString();
     return {
