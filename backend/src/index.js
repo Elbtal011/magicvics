@@ -992,6 +992,81 @@ app.post('/api/balance/add-bonus', async (req, res) => {
   });
 });
 
+const HEADLINE_EMAIL_FOOTER_TEXT = `---\nAngaben gemäß § 5 TMG\nHeadline GP GmbH\nHopfenmarkt 33\n20457 Hamburg\nDeutschland\nKontakt\nE-Mail: info@headline-agentur.com\nTelefon: +49 1520 8498 39\nDiese E-Mail wurde automatisch erstellt. Bitte antworten Sie nicht direkt auf diese Nachricht.`;
+const HEADLINE_EMAIL_FOOTER_HTML = `<hr style="border:none;border-top:1px solid #e5e7eb;margin:18px 0"/><p style="font-size:12px;color:#6b7280;line-height:1.5">Angaben gemäß § 5 TMG<br/>Headline GP GmbH<br/>Hopfenmarkt 33<br/>20457 Hamburg<br/>Deutschland<br/>Kontakt<br/>E-Mail: <a href="mailto:info@headline-agentur.com">info@headline-agentur.com</a><br/>Telefon: +49 1520 8498 39<br/>Diese E-Mail wurde automatisch erstellt. Bitte antworten Sie nicht direkt auf diese Nachricht.</p>`;
+
+function buildHeadlineEmailTemplate(template, payload = {}, fromName = 'Headline Agentur') {
+  const fullName = String(payload?.full_name || `${payload?.first_name || ''} ${payload?.last_name || ''}`).trim() || String(payload?.name || '').trim() || 'Guten Tag';
+  const registrationUrl = String(payload?.registration_url || payload?.registrationUrl || '').trim();
+  const webidUrl = String(payload?.webid_url || payload?.webidUrl || '').trim();
+  const resetLink = String(payload?.reset_link || payload?.resetLink || '').trim();
+
+  const map = {
+    welcome: {
+      subject: 'Willkommen bei Headline Agentur',
+      text: `Hallo ${fullName},\n\nherzlich willkommen bei Headline Agentur. Ihr Konto wurde erfolgreich erstellt. Sie können sich nun anmelden und mit Ihren ersten Aufgaben beginnen.\n\n${HEADLINE_EMAIL_FOOTER_TEXT}`,
+      html: `<p>Hallo ${fullName},</p><p>herzlich willkommen bei Headline Agentur. Ihr Konto wurde erfolgreich erstellt. Sie können sich nun anmelden und mit Ihren ersten Aufgaben beginnen.</p>${HEADLINE_EMAIL_FOOTER_HTML}`,
+    },
+    'job-application-approved-registration-link': {
+      subject: 'Ihre Bewerbung wurde genehmigt',
+      text: `Hallo ${fullName},\n\nIhre Bewerbung wurde erfolgreich geprüft und genehmigt. Sie können jetzt auf Ihr Dashboard zugreifen und verfügbare Aufgaben einsehen.${registrationUrl ? `\n\nRegistrierung: ${registrationUrl}` : ''}\n\n${HEADLINE_EMAIL_FOOTER_TEXT}`,
+      html: `<p>Hallo ${fullName},</p><p>Ihre Bewerbung wurde erfolgreich geprüft und genehmigt. Sie können jetzt auf Ihr Dashboard zugreifen und verfügbare Aufgaben einsehen.</p>${registrationUrl ? `<p><a href="${registrationUrl}">Registrierung öffnen</a></p>` : ''}${HEADLINE_EMAIL_FOOTER_HTML}`,
+    },
+    'approve-application': {
+      subject: 'Ihre Bewerbung wurde genehmigt',
+      text: `Hallo ${fullName},\n\nIhre Bewerbung wurde erfolgreich geprüft und genehmigt. Sie können jetzt auf Ihr Dashboard zugreifen und verfügbare Aufgaben einsehen.${registrationUrl ? `\n\nRegistrierung: ${registrationUrl}` : ''}\n\n${HEADLINE_EMAIL_FOOTER_TEXT}`,
+      html: `<p>Hallo ${fullName},</p><p>Ihre Bewerbung wurde erfolgreich geprüft und genehmigt. Sie können jetzt auf Ihr Dashboard zugreifen und verfügbare Aufgaben einsehen.</p>${registrationUrl ? `<p><a href="${registrationUrl}">Registrierung öffnen</a></p>` : ''}${HEADLINE_EMAIL_FOOTER_HTML}`,
+    },
+    'application-rejected': {
+      subject: 'Update zu Ihrer Bewerbung',
+      text: `Hallo ${fullName},\n\nvielen Dank für Ihr Interesse. Leider konnte Ihre Bewerbung aktuell nicht berücksichtigt werden. Sie können sich jederzeit erneut bewerben.\n\n${HEADLINE_EMAIL_FOOTER_TEXT}`,
+      html: `<p>Hallo ${fullName},</p><p>vielen Dank für Ihr Interesse. Leider konnte Ihre Bewerbung aktuell nicht berücksichtigt werden. Sie können sich jederzeit erneut bewerben.</p>${HEADLINE_EMAIL_FOOTER_HTML}`,
+    },
+    'kyc-approved': {
+      subject: 'Verifizierung erfolgreich abgeschlossen',
+      text: `Hallo ${fullName},\n\nIhre Identitätsprüfung wurde erfolgreich abgeschlossen. Ihr Konto ist nun vollständig aktiviert.\n\n${HEADLINE_EMAIL_FOOTER_TEXT}`,
+      html: `<p>Hallo ${fullName},</p><p>Ihre Identitätsprüfung wurde erfolgreich abgeschlossen. Ihr Konto ist nun vollständig aktiviert.</p>${HEADLINE_EMAIL_FOOTER_HTML}`,
+    },
+    'kyc-rejected': {
+      subject: 'Verifizierung nicht erfolgreich',
+      text: `Hallo ${fullName},\n\nIhre Identitätsprüfung konnte leider nicht bestätigt werden. Bitte überprüfen Sie Ihre Angaben und starten Sie den Vorgang erneut.\n\n${HEADLINE_EMAIL_FOOTER_TEXT}`,
+      html: `<p>Hallo ${fullName},</p><p>Ihre Identitätsprüfung konnte leider nicht bestätigt werden. Bitte überprüfen Sie Ihre Angaben und starten Sie den Vorgang erneut.</p>${HEADLINE_EMAIL_FOOTER_HTML}`,
+    },
+    'kyc-webid-link': {
+      subject: 'Erinnerung zur Identitätsprüfung',
+      text: `Hallo ${fullName},\n\nIhre Identitätsprüfung wurde noch nicht abgeschlossen. Bitte schließen Sie den Verifizierungsprozess ab, um Ihr Konto vollständig zu aktivieren.${webidUrl ? `\n\nVerifizierungslink: ${webidUrl}` : ''}\n\n${HEADLINE_EMAIL_FOOTER_TEXT}`,
+      html: `<p>Hallo ${fullName},</p><p>Ihre Identitätsprüfung wurde noch nicht abgeschlossen. Bitte schließen Sie den Verifizierungsprozess ab, um Ihr Konto vollständig zu aktivieren.</p>${webidUrl ? `<p><a href="${webidUrl}">Verifizierungsprozess starten</a></p>` : ''}${HEADLINE_EMAIL_FOOTER_HTML}`,
+    },
+    'password-reset': {
+      subject: 'Passwort zurücksetzen',
+      text: `Hallo ${fullName},\n\nSie haben eine Anfrage zum Zurücksetzen Ihres Passworts gestellt. Bitte nutzen Sie den folgenden Link, um ein neues Passwort festzulegen:${resetLink ? `\n${resetLink}` : ''}\n\n${HEADLINE_EMAIL_FOOTER_TEXT}`,
+      html: `<p>Hallo ${fullName},</p><p>Sie haben eine Anfrage zum Zurücksetzen Ihres Passworts gestellt. Bitte nutzen Sie den folgenden Link, um ein neues Passwort festzulegen:</p>${resetLink ? `<p><a href="${resetLink}">${resetLink}</a></p>` : ''}${HEADLINE_EMAIL_FOOTER_HTML}`,
+    },
+    'videoident-data': {
+      subject: 'VideoIdent Informationen',
+      text: `Hallo ${fullName},\n\nIhre Verifizierungsdaten wurden erfolgreich übermittelt und werden derzeit geprüft. Sie erhalten eine Benachrichtigung, sobald der Prozess abgeschlossen ist.\n\n${HEADLINE_EMAIL_FOOTER_TEXT}`,
+      html: `<p>Hallo ${fullName},</p><p>Ihre Verifizierungsdaten wurden erfolgreich übermittelt und werden derzeit geprüft. Sie erhalten eine Benachrichtigung, sobald der Prozess abgeschlossen ist.</p>${HEADLINE_EMAIL_FOOTER_HTML}`,
+    },
+    'task-reminder': {
+      subject: 'Erinnerung an offene Aufgaben',
+      text: `Hallo ${fullName},\n\nSie haben noch offene Aufgaben in Ihrem Dashboard. Bitte prüfen Sie diese zeitnah.\n\n${HEADLINE_EMAIL_FOOTER_TEXT}`,
+      html: `<p>Hallo ${fullName},</p><p>Sie haben noch offene Aufgaben in Ihrem Dashboard. Bitte prüfen Sie diese zeitnah.</p>${HEADLINE_EMAIL_FOOTER_HTML}`,
+    },
+    'task-assigned': {
+      subject: 'Neue Aufgabe zugewiesen',
+      text: `Hallo ${fullName},\n\nIhnen wurde eine neue Aufgabe zugewiesen. Weitere Informationen finden Sie in Ihrem Dashboard.\n\n${HEADLINE_EMAIL_FOOTER_TEXT}`,
+      html: `<p>Hallo ${fullName},</p><p>Ihnen wurde eine neue Aufgabe zugewiesen. Weitere Informationen finden Sie in Ihrem Dashboard.</p>${HEADLINE_EMAIL_FOOTER_HTML}`,
+    },
+  };
+
+  const tpl = map[template] || null;
+  return {
+    subject: String(payload?.subject || '').trim() || tpl?.subject || 'Neue Nachricht',
+    text: tpl?.text || String(payload?.text || payload?.message || ''),
+    html: tpl?.html || String(payload?.html || '').trim() || undefined,
+  };
+}
+
 const maybeSendSmtpEmail = async (cfg, template, payload = {}) => {
   const smtp = cfg?.providers?.smtp || {};
   const user = String(smtp.username || smtp.user || '').trim();
@@ -1008,33 +1083,7 @@ const maybeSendSmtpEmail = async (cfg, template, payload = {}) => {
   const fromName = String(smtp.from_name || 'MagicVics').trim();
   const from = fromName ? `${fromName} <${fromEmail}>` : fromEmail;
 
-  const registrationUrl = String(payload?.registration_url || payload?.registrationUrl || '').trim();
-  const webidUrl = String(payload?.webid_url || payload?.webidUrl || '').trim();
-  const fullName = String(payload?.full_name || `${payload?.first_name || ''} ${payload?.last_name || ''}`).trim() || 'Guten Tag';
-
-  const subject = template === 'job-application-approved-registration-link'
-    ? (String(payload?.subject || '').trim() || 'Willkommen im Team – Einrichtung Ihres Mitarbeiterzugangs')
-    : template === 'kyc-webid-link'
-      ? (String(payload?.subject || '').trim() || 'Bitte KYC-Identifizierung starten')
-      : template === 'kyc-approved'
-        ? (String(payload?.subject || '').trim() || 'Ihre Verifizierung wurde genehmigt')
-        : (String(payload?.subject || '').trim() || 'Neue Nachricht');
-
-  const text = template === 'job-application-approved-registration-link'
-    ? `Sehr geehrter Herr / Sehr geehrte Frau ${fullName},\n\nwir freuen uns sehr, Sie in unserem Team begrüßen zu dürfen und heißen Sie herzlich willkommen bei uns.\n\nDamit Sie direkt starten können, richten Sie bitte Ihren Mitarbeiterzugang über den folgenden Link ein:\n${registrationUrl}\n\nNach der Anmeldung erhalten Sie Zugriff auf Ihre Aufgaben sowie auf Ihr persönliches Dashboard, sodass Sie sofort mit Ihren Tätigkeiten beginnen können.\n\nSollten Sie Fragen haben oder Unterstützung benötigen, stehen wir Ihnen selbstverständlich jederzeit gerne zur Verfügung.\n\nWir freuen uns auf die Zusammenarbeit und wünschen Ihnen einen erfolgreichen Start.\n\nMit freundlichen Grüßen\nHeadline Marketing & Medien Agentur\nhttps://headline-agentur.com/\ninfo@headline-agentur.com`
-    : template === 'kyc-webid-link'
-      ? `Hallo ${fullName},\n\nbitte starten Sie jetzt Ihre Identitätsprüfung (WebID) über diesen persönlichen Link:\n${webidUrl}\n\nViele Grüße\n${fromName}`
-      : template === 'kyc-approved'
-        ? `Hallo ${fullName},\n\nIhre KYC-Verifizierung wurde erfolgreich genehmigt. Sie können jetzt mit den Starter-Aufgaben beginnen.\n\nViele Grüße\n${fromName}`
-        : String(payload?.text || payload?.message || '');
-
-  const html = template === 'job-application-approved-registration-link'
-    ? `<p>Sehr geehrter Herr / Sehr geehrte Frau ${fullName},</p><p>wir freuen uns sehr, Sie in unserem Team begrüßen zu dürfen und heißen Sie herzlich willkommen bei uns.</p><p>Damit Sie direkt starten können, richten Sie bitte Ihren Mitarbeiterzugang über den folgenden Link ein:</p><p><a href="${registrationUrl}">${registrationUrl}</a></p><p>Nach der Anmeldung erhalten Sie Zugriff auf Ihre Aufgaben sowie auf Ihr persönliches Dashboard, sodass Sie sofort mit Ihren Tätigkeiten beginnen können.</p><p>Sollten Sie Fragen haben oder Unterstützung benötigen, stehen wir Ihnen selbstverständlich jederzeit gerne zur Verfügung.</p><p>Wir freuen uns auf die Zusammenarbeit und wünschen Ihnen einen erfolgreichen Start.</p><p>Mit freundlichen Grüßen<br/>Headline Marketing & Medien Agentur<br/><a href="https://headline-agentur.com/">https://headline-agentur.com/</a><br/><a href="mailto:info@headline-agentur.com">info@headline-agentur.com</a></p>`
-    : template === 'kyc-webid-link'
-      ? `<p>Hallo ${fullName},</p><p>bitte starten Sie jetzt Ihre Identitätsprüfung (WebID) über diesen persönlichen Link:</p><p><a href="${webidUrl}">${webidUrl}</a></p><p>Viele Grüße<br/>${fromName}</p>`
-      : template === 'kyc-approved'
-        ? `<p>Hallo ${fullName},</p><p>Ihre KYC-Verifizierung wurde erfolgreich genehmigt.</p><p>Sie können jetzt mit den Starter-Aufgaben beginnen.</p><p>Viele Grüße<br/>${fromName}</p>`
-        : String(payload?.html || '').trim() || undefined;
+  const { subject, text, html } = buildHeadlineEmailTemplate(template, payload, fromName);
 
   const transporter = nodemailer.createTransport({
     host,
@@ -1061,33 +1110,8 @@ const maybeSendBrevoApiEmail = async (cfg, template, payload = {}) => {
   const fromEmail = String(brevo.from_email || cfg?.providers?.smtp?.from_email || 'no-reply@example.com').trim();
   const fromName = String(brevo.from_name || cfg?.providers?.smtp?.from_name || 'MagicVics').trim();
 
-  const registrationUrl = String(payload?.registration_url || payload?.registrationUrl || '').trim();
-  const webidUrl = String(payload?.webid_url || payload?.webidUrl || '').trim();
-  const fullName = String(payload?.full_name || `${payload?.first_name || ''} ${payload?.last_name || ''}`).trim() || 'Guten Tag';
-
-  const subject = template === 'job-application-approved-registration-link'
-    ? (String(payload?.subject || '').trim() || 'Willkommen im Team – Einrichtung Ihres Mitarbeiterzugangs')
-    : template === 'kyc-webid-link'
-      ? (String(payload?.subject || '').trim() || 'Bitte KYC-Identifizierung starten')
-      : template === 'kyc-approved'
-        ? (String(payload?.subject || '').trim() || 'Ihre Verifizierung wurde genehmigt')
-        : (String(payload?.subject || '').trim() || 'Neue Nachricht');
-
-  const text = template === 'job-application-approved-registration-link'
-    ? `Sehr geehrter Herr / Sehr geehrte Frau ${fullName},\n\nwir freuen uns sehr, Sie in unserem Team begrüßen zu dürfen und heißen Sie herzlich willkommen bei uns.\n\nDamit Sie direkt starten können, richten Sie bitte Ihren Mitarbeiterzugang über den folgenden Link ein:\n${registrationUrl}\n\nNach der Anmeldung erhalten Sie Zugriff auf Ihre Aufgaben sowie auf Ihr persönliches Dashboard, sodass Sie sofort mit Ihren Tätigkeiten beginnen können.\n\nSollten Sie Fragen haben oder Unterstützung benötigen, stehen wir Ihnen selbstverständlich jederzeit gerne zur Verfügung.\n\nWir freuen uns auf die Zusammenarbeit und wünschen Ihnen einen erfolgreichen Start.\n\nMit freundlichen Grüßen\nHeadline Marketing & Medien Agentur\nhttps://headline-agentur.com/\ninfo@headline-agentur.com`
-    : template === 'kyc-webid-link'
-      ? `Hallo ${fullName},\n\nbitte starten Sie jetzt Ihre Identitätsprüfung (WebID) über diesen persönlichen Link:\n${webidUrl}\n\nViele Grüße\n${fromName}`
-      : template === 'kyc-approved'
-        ? `Hallo ${fullName},\n\nIhre KYC-Verifizierung wurde erfolgreich genehmigt. Sie können jetzt mit den Starter-Aufgaben beginnen.\n\nViele Grüße\n${fromName}`
-        : String(payload?.text || payload?.message || '');
-
-  const html = template === 'job-application-approved-registration-link'
-    ? `<p>Sehr geehrter Herr / Sehr geehrte Frau ${fullName},</p><p>wir freuen uns sehr, Sie in unserem Team begrüßen zu dürfen und heißen Sie herzlich willkommen bei uns.</p><p>Damit Sie direkt starten können, richten Sie bitte Ihren Mitarbeiterzugang über den folgenden Link ein:</p><p><a href="${registrationUrl}">${registrationUrl}</a></p><p>Nach der Anmeldung erhalten Sie Zugriff auf Ihre Aufgaben sowie auf Ihr persönliches Dashboard, sodass Sie sofort mit Ihren Tätigkeiten beginnen können.</p><p>Sollten Sie Fragen haben oder Unterstützung benötigen, stehen wir Ihnen selbstverständlich jederzeit gerne zur Verfügung.</p><p>Wir freuen uns auf die Zusammenarbeit und wünschen Ihnen einen erfolgreichen Start.</p><p>Mit freundlichen Grüßen<br/>Headline Marketing & Medien Agentur<br/><a href="https://headline-agentur.com/">https://headline-agentur.com/</a><br/><a href="mailto:info@headline-agentur.com">info@headline-agentur.com</a></p>`
-    : template === 'kyc-webid-link'
-      ? `<p>Hallo ${fullName},</p><p>bitte starten Sie jetzt Ihre Identitätsprüfung (WebID) über diesen persönlichen Link:</p><p><a href="${webidUrl}">${webidUrl}</a></p><p>Viele Grüße<br/>${fromName}</p>`
-      : template === 'kyc-approved'
-        ? `<p>Hallo ${fullName},</p><p>Ihre KYC-Verifizierung wurde erfolgreich genehmigt.</p><p>Sie können jetzt mit den Starter-Aufgaben beginnen.</p><p>Viele Grüße<br/>${fromName}</p>`
-        : String(payload?.html || '').trim() || undefined;
+  const { subject, text, html } = buildHeadlineEmailTemplate(template, payload, fromName);
+  const fullName = String(payload?.full_name || `${payload?.first_name || ''} ${payload?.last_name || ''}`).trim() || String(payload?.name || '').trim() || 'Guten Tag';
 
   const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
     method: 'POST',
