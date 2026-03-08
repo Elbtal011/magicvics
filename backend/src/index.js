@@ -1753,10 +1753,47 @@ const EMAIL_PROVIDER_DEFAULTS = {
   }
 };
 
-function emailProvidersRowsFromConfig(cfg = EMAIL_PROVIDER_DEFAULTS) {
+async function getEmailDeliveryStatsMap() {
+  try {
+    const rows = await prisma.setting.findMany({ where: { key: { startsWith: 'email:' } } });
+    const byProvider = {};
+    const now = Date.now();
+    const windowMs = 7 * 24 * 60 * 60 * 1000;
+
+    for (const row of rows) {
+      if (row.key === 'email:providers') continue;
+      const events = Array.isArray(row?.value?.events) ? row.value.events : [];
+      for (const ev of events) {
+        const delivery = ev?.delivery || {};
+        const provider = String(delivery?.provider || '').toLowerCase();
+        if (!provider) continue;
+
+        const ts = Date.parse(String(ev?.at || ''));
+        if (!Number.isFinite(ts) || (now - ts) > windowMs) continue;
+
+        if (!byProvider[provider]) byProvider[provider] = { sent: 0, errors: 0, total: 0, success_rate: 0 };
+        byProvider[provider].total += 1;
+        if (delivery?.sent) byProvider[provider].sent += 1;
+        else byProvider[provider].errors += 1;
+      }
+    }
+
+    for (const key of Object.keys(byProvider)) {
+      const s = byProvider[key];
+      s.success_rate = s.total > 0 ? Number(((s.sent / s.total) * 100).toFixed(1)) : 0;
+    }
+
+    return byProvider;
+  } catch {
+    return {};
+  }
+}
+
+function emailProvidersRowsFromConfig(cfg = EMAIL_PROVIDER_DEFAULTS, statsMap = {}) {
   const providersMap = cfg?.providers || {};
   return Object.entries(providersMap).map(([key, value], idx) => {
     const p = value || {};
+    const st = statsMap?.[key] || { sent: 0, errors: 0, total: 0, success_rate: 0 };
     return {
       id: idx + 1,
       provider_key: key,
@@ -1780,13 +1817,17 @@ function emailProvidersRowsFromConfig(cfg = EMAIL_PROVIDER_DEFAULTS) {
       is_active: cfg?.active_provider === key,
       active: cfg?.active_provider === key,
       enabled: p.enabled !== false,
+      sent_count: st.sent,
+      error_count: st.errors,
+      success_rate: st.success_rate,
     };
   });
 }
 
 app.get('/api/email/providers', async (_req, res) => {
   const data = await getSettingJson('email:providers', EMAIL_PROVIDER_DEFAULTS);
-  const rows = emailProvidersRowsFromConfig(data);
+  const statsMap = await getEmailDeliveryStatsMap();
+  const rows = emailProvidersRowsFromConfig(data, statsMap);
   // Frontend expects a plain array here
   res.json(rows);
 });
@@ -1838,7 +1879,8 @@ app.post('/api/email/providers', async (req, res) => {
   };
 
   await putSettingJson('email:providers', next);
-  const rows = emailProvidersRowsFromConfig(next);
+  const statsMap = await getEmailDeliveryStatsMap();
+  const rows = emailProvidersRowsFromConfig(next, statsMap);
   const created = rows.find((r) => r.provider_key === providerKey) || rows[0] || null;
   res.json(created || { success: true });
 });
@@ -1878,7 +1920,8 @@ app.put('/api/email/providers/:id', async (req, res) => {
   };
 
   await putSettingJson('email:providers', next);
-  const rows = emailProvidersRowsFromConfig(next);
+  const statsMap = await getEmailDeliveryStatsMap();
+  const rows = emailProvidersRowsFromConfig(next, statsMap);
   const updated = rows.find((r) => r.provider_key === providerKey) || rows[0] || null;
   res.json(updated || { success: true });
 });
@@ -1906,36 +1949,9 @@ app.post('/api/email/providers/:id/test', async (_req, res) => {
 
 // Backward-compatible admin endpoints expected by older dashboard builds
 app.get('/api/admin/email-providers', async (_req, res) => {
-  const defaults = {
-    active_provider: 'smtp',
-    providers: {
-      smtp: { enabled: true, host: '', port: 587, secure: false, username: '', password: '', from_email: '', from_name: 'Headline Agentur' },
-      resend: { enabled: false, api_key: '', from_email: '', from_name: 'Headline Agentur' },
-      sendgrid: { enabled: false, api_key_set: false, from_email: '', from_name: 'Headline Agentur' },
-      brevo: { enabled: false, api_key: '', from_email: '', from_name: 'Headline Agentur' }
-    }
-  };
-  const data = await getSettingJson('email:providers', defaults);
-  const providersMap = data?.providers || {};
-  const rows = Object.entries(providersMap).map(([key, value], idx) => {
-    const p = value || {};
-    return {
-      id: idx + 1,
-      provider_key: key,
-      name: p.from_name || 'Headline Agentur',
-      provider_type: key === 'smtp' ? 'smtp' : 'api',
-      from_email: p.from_email || '',
-      from_name: p.from_name || 'Headline Agentur',
-      host: p.host || null,
-      port: p.port || null,
-      secure: !!p.secure,
-      username: p.username ? '***' : null,
-      api_key_set: !!(p.api_key || p.api_key_set),
-      priority: 1,
-      is_active: data?.active_provider === key,
-      enabled: p.enabled !== false,
-    };
-  });
+  const data = await getSettingJson('email:providers', EMAIL_PROVIDER_DEFAULTS);
+  const statsMap = await getEmailDeliveryStatsMap();
+  const rows = emailProvidersRowsFromConfig(data, statsMap);
   res.json({
     success: true,
     status: 'success',
