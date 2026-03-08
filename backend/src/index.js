@@ -53,18 +53,21 @@ const defaultChatReply = (content) => `Danke fÃ¼r deine Nachricht: "${String(c
 const DEFAULT_KNOWLEDGE_ARTICLES = [
   {
     id: 'kba-1',
-    title: 'Erster Arbeitstag: Ablauf',
-    content: 'Schritte vom Login bis zur ersten abgeschlossenen Aufgabe.'
+    title: 'Unternehmensprofil: Headline Agentur',
+    content:
+      'Headline Agentur ist ein Partner für Digitalisierung und unterstützt Unternehmen bei der praktischen Umsetzung digitaler Prozesse im Arbeitsalltag.'
   },
   {
     id: 'kba-2',
-    title: 'KYC: Dokumente und hÃ¤ufige Fehler',
-    content: 'Welche Dokumente akzeptiert werden und was oft zu Ablehnungen fÃ¼hrt.'
+    title: 'Leistungsfokus',
+    content:
+      'Der Schwerpunkt liegt auf Beratung, Strukturierung und Koordination von digitalen Lösungen. Antworte klar, lösungsorientiert und ohne übertriebene Versprechen.'
   },
   {
     id: 'kba-3',
-    title: 'Auszahlung: Status und Fristen',
-    content: 'Wann Auszahlungen genehmigt werden und wie lange die Bearbeitung dauert.'
+    title: 'Kommunikationsregeln für den Chat',
+    content:
+      'Wenn Informationen fehlen: kurze Rückfrage stellen. Keine erfundenen Fakten. Keine Rechts-, Steuer-, Finanz- oder Medizinberatung geben. Bei sensiblen Einzelfällen an das Team/Admin zur Klärung verweisen.'
   }
 ];
 
@@ -110,7 +113,12 @@ async function generateOpenAIReply({ content, history = [], snippets = [] }) {
     {
       role: 'system',
       content:
-        `Du bist der Karriere- und Support-Assistent von ${CHAT_BRAND_NAME}. Antworte kurz, hilfreich und auf Deutsch. Wenn Informationen fehlen, stelle eine kurze RÃ¼ckfrage. Erfinde keine Fakten.` +
+        `Du bist der Website- und Support-Assistent von ${CHAT_BRAND_NAME}. ` +
+        `Antworte standardmäßig auf Deutsch, kurz, professionell und freundlich. ` +
+        `Bleibe beim Kontext von ${CHAT_BRAND_NAME}: Digitalisierung, Beratung und Prozessunterstützung. ` +
+        `Wenn Informationen fehlen, stelle genau eine kurze Rückfrage. ` +
+        `Erfinde keine Fakten und gib keine Rechts-, Steuer-, Finanz- oder Medizinberatung. ` +
+        `Wenn eine Anfrage außerhalb des Wissens liegt, sage das transparent und verweise auf Kontakt mit dem Team/Admin.` +
         kbBlock
     },
     ...history,
@@ -125,7 +133,7 @@ async function generateOpenAIReply({ content, history = [], snippets = [] }) {
     },
     body: JSON.stringify({
       model: OPENAI_MODEL,
-      temperature: 0.4,
+      temperature: 0.2,
       messages
     })
   });
