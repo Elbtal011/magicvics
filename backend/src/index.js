@@ -1815,7 +1815,14 @@ app.get('/api/admin/email-providers', async (_req, res) => {
       enabled: p.enabled !== false,
     };
   });
-  res.json({ success: true, data: rows, active_provider: data?.active_provider || null });
+  res.json({
+    success: true,
+    status: 'success',
+    data: rows,
+    providers: rows,
+    active_provider: data?.active_provider || null,
+    total: rows.length,
+  });
 });
 
 app.post('/api/admin/email-providers', async (req, res) => {
