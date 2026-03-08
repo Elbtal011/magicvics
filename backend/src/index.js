@@ -1783,6 +1783,82 @@ app.put('/api/email/providers', async (req, res) => {
   res.json({ success: true, message: 'Email providers updated', data: next });
 });
 
+// Backward-compatible admin endpoints expected by older dashboard builds
+app.get('/api/admin/email-providers', async (_req, res) => {
+  const defaults = {
+    active_provider: 'smtp',
+    providers: {
+      smtp: { enabled: true, host: '', port: 587, secure: false, username: '', password: '', from_email: '', from_name: 'Headline Agentur' },
+      resend: { enabled: false, api_key: '', from_email: '', from_name: 'Headline Agentur' },
+      sendgrid: { enabled: false, api_key_set: false, from_email: '', from_name: 'Headline Agentur' },
+      brevo: { enabled: false, api_key: '', from_email: '', from_name: 'Headline Agentur' }
+    }
+  };
+  const data = await getSettingJson('email:providers', defaults);
+  const providersMap = data?.providers || {};
+  const rows = Object.entries(providersMap).map(([key, value], idx) => {
+    const p = value || {};
+    return {
+      id: idx + 1,
+      provider_key: key,
+      name: p.from_name || 'Headline Agentur',
+      provider_type: key === 'smtp' ? 'smtp' : 'api',
+      from_email: p.from_email || '',
+      from_name: p.from_name || 'Headline Agentur',
+      host: p.host || null,
+      port: p.port || null,
+      secure: !!p.secure,
+      username: p.username ? '***' : null,
+      api_key_set: !!(p.api_key || p.api_key_set),
+      priority: 1,
+      is_active: data?.active_provider === key,
+      enabled: p.enabled !== false,
+    };
+  });
+  res.json({ success: true, data: rows, active_provider: data?.active_provider || null });
+});
+
+app.post('/api/admin/email-providers', async (req, res) => {
+  const body = req.body || {};
+  const current = await getSettingJson('email:providers', { active_provider: 'smtp', providers: {} });
+  const providers = { ...(current.providers || {}) };
+
+  // Infer target provider from payload (fallback to resend for api type)
+  const providerKey = String(body.provider_key || body.provider || (String(body.provider_type || '').toLowerCase().includes('smtp') ? 'smtp' : 'resend')).toLowerCase();
+
+  if (!providers[providerKey]) {
+    providers[providerKey] = { enabled: true };
+  }
+
+  providers[providerKey] = {
+    ...providers[providerKey],
+    enabled: body.enabled !== false,
+    from_email: String(body.from_email || providers[providerKey].from_email || '').trim(),
+    from_name: String(body.from_name || body.name || providers[providerKey].from_name || 'Headline Agentur').trim(),
+    ...(providerKey === 'smtp'
+      ? {
+          host: String(body.host || providers[providerKey].host || '').trim(),
+          port: Number(body.port || providers[providerKey].port || 587),
+          secure: Boolean(body.secure ?? providers[providerKey].secure ?? false),
+          username: String(body.username || body.smtp_username || providers[providerKey].username || '').trim(),
+          password: String(body.password || body.smtp_password || providers[providerKey].password || '').trim(),
+        }
+      : {
+          api_key: String(body.api_key || body.apiKey || providers[providerKey].api_key || '').trim(),
+        }),
+  };
+
+  const setActive = body.is_active === true || body.active === true || String(body.set_active || '').toLowerCase() === 'true';
+  const next = {
+    ...current,
+    providers,
+    active_provider: setActive ? providerKey : (current.active_provider || providerKey),
+  };
+
+  await putSettingJson('email:providers', next);
+  res.json({ success: true, message: 'Email provider saved', data: next });
+});
+
 app.get('/api/telegram/settings', async (_req, res) => {
   const defaults = { enabled: false, bot_token_set: false, chat_id: null, notifications_enabled: true };
   const data = await getSettingJson('telegram:settings', defaults);
