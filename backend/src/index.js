@@ -3051,16 +3051,28 @@ async function assignStarterTasksToProfile(profileId, createdBy = 'kyc_approved_
   }
 
   // Also write to real task_assignments table so Mitarbeiter dashboard sees tasks immediately.
+  // IMPORTANT: assignee_id has FK to Employee.id (not Profile.id).
   let dbCreated = 0;
   try {
-    const employee = await prisma.employee.findUnique({ where: { profileId: assigneeId }, select: { id: true } }).catch(() => null);
-    const assigneeCandidates = Array.from(new Set([assigneeId, employee?.id].filter(Boolean)));
+    let employee = await prisma.employee.findUnique({ where: { profileId: assigneeId }, select: { id: true } });
 
-    for (const tpl of starterTemplates) {
-      for (const candidateId of assigneeCandidates) {
+    // Auto-create missing employee row for newly registered user profiles.
+    if (!employee) {
+      employee = await prisma.employee.create({
+        data: {
+          profileId: assigneeId,
+          status: 'active',
+        },
+        select: { id: true },
+      });
+    }
+
+    const employeeId = employee?.id;
+    if (employeeId) {
+      for (const tpl of starterTemplates) {
         const existingDb = await prisma.taskAssignment.findFirst({
           where: {
-            assigneeId: candidateId,
+            assigneeId: employeeId,
             title: String(tpl.title || '').trim(),
             status: { in: ['pending', 'open', 'accepted', 'assigned', 'in_progress'] },
           },
@@ -3069,7 +3081,7 @@ async function assignStarterTasksToProfile(profileId, createdBy = 'kyc_approved_
 
         await prisma.taskAssignment.create({
           data: {
-            assigneeId: candidateId,
+            assigneeId: employeeId,
             title: String(tpl.title || 'Starter-Aufgabe').trim(),
             status: 'pending',
             dueDate: new Date(dueDate),
