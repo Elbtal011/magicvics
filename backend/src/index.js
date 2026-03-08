@@ -10,16 +10,27 @@ const app = express();
 const prisma = new PrismaClient();
 const port = Number(process.env.PORT || 4000);
 
-const allowedOrigins = String(process.env.FRONTEND_ORIGIN || '*')
+const defaultAllowedOrigins = [
+  'https://portal.headline-agentur.com',
+  'https://headline-agentur.com',
+  'https://www.headline-agentur.com'
+];
+
+const allowedOrigins = String(process.env.FRONTEND_ORIGIN || process.env.CORS_ORIGINS || '')
   .split(',')
   .map((s) => s.trim())
   .filter(Boolean);
+
+const normalizedAllowedOrigins = (allowedOrigins.length ? allowedOrigins : defaultAllowedOrigins).map((o) =>
+  o.replace(/\/$/, '').toLowerCase()
+);
 
 app.use(
   cors({
     origin: (origin, cb) => {
       if (!origin) return cb(null, true);
-      if (allowedOrigins.includes('*') || allowedOrigins.includes(origin)) return cb(null, true);
+      const normalizedOrigin = String(origin).replace(/\/$/, '').toLowerCase();
+      if (normalizedAllowedOrigins.includes('*') || normalizedAllowedOrigins.includes(normalizedOrigin)) return cb(null, true);
       return cb(new Error(`CORS blocked for origin: ${origin}`));
     }
   })
