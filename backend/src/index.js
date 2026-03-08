@@ -2951,7 +2951,20 @@ const isKycApprovedStatus = (v) => ['approved', 'verified', 'genehmigt'].include
 async function ensureDefaultStarterTemplates() {
   const templates = await getTaskTemplates();
   const starter = templates.filter((t) => Boolean(t.is_starter_job));
-  if (starter.length >= 2) return templates;
+
+  // Keep starter task completion timing at 7 days (168h) for existing templates too.
+  if (starter.length >= 2) {
+    let changed = false;
+    const normalizedExisting = templates.map((t) => {
+      if (!t.is_starter_job) return t;
+      const nextHours = 168;
+      if (Number(t.estimated_hours) === nextHours) return t;
+      changed = true;
+      return { ...t, estimated_hours: nextHours, updated_at: nowIso() };
+    });
+    if (changed) await saveTaskTemplates(normalizedExisting);
+    return normalizedExisting;
+  }
 
   const defaults = [
     {
@@ -2959,7 +2972,7 @@ async function ensureDefaultStarterTemplates() {
       description: 'Pflege 20 CRM-DatensÃ¤tze, setze Status korrekt und dokumentiere Follow-ups sauber.',
       type: 'standard',
       priority: 'medium',
-      estimated_hours: 2,
+      estimated_hours: 168,
       is_starter_job: true,
       steps: ['DatensÃ¤tze prÃ¼fen', 'Status aktualisieren', 'Follow-up Notizen dokumentieren'],
       created_by: 'system',
@@ -2969,7 +2982,7 @@ async function ensureDefaultStarterTemplates() {
       description: 'PrÃ¼fe den Leitfaden auf BegrÃ¼ÃŸung, Bedarfsermittlung, Einwandbehandlung und Abschluss.',
       type: 'standard',
       priority: 'medium',
-      estimated_hours: 2,
+      estimated_hours: 168,
       is_starter_job: true,
       steps: ['Leitfaden prÃ¼fen', 'Abweichungen notieren', 'VerbesserungsvorschlÃ¤ge eintragen'],
       created_by: 'system',
