@@ -1747,14 +1747,33 @@ app.get('/api/email/providers', async (_req, res) => {
   const defaults = {
     active_provider: 'smtp',
     providers: {
-      smtp: { enabled: true, host: '', port: 587, secure: false, username: '', password: '', from_email: '', from_name: 'MagicVics' },
+      smtp: { enabled: true, host: '', port: 587, secure: false, username: '', password: '', from_email: '', from_name: 'Headline Agentur' },
       resend: { enabled: false, api_key: '', from_email: '', from_name: 'Headline Agentur' },
-      sendgrid: { enabled: false, api_key_set: false, from_email: '' },
-      brevo: { enabled: false, api_key: '', from_email: '', from_name: 'MagicVics' }
+      sendgrid: { enabled: false, api_key_set: false, from_email: '', from_name: 'Headline Agentur' },
+      brevo: { enabled: false, api_key: '', from_email: '', from_name: 'Headline Agentur' }
     }
   };
   const data = await getSettingJson('email:providers', defaults);
-  res.json({ success: true, data });
+
+  const providersMap = data?.providers || {};
+  const providers = Object.entries(providersMap).map(([key, value]) => {
+    const p = value || {};
+    return {
+      id: key,
+      provider: key,
+      enabled: p.enabled !== false,
+      active: data?.active_provider === key,
+      host: p.host || null,
+      port: p.port || null,
+      secure: !!p.secure,
+      from_email: p.from_email || null,
+      from_name: p.from_name || null,
+      username: p.username ? '***' : null,
+      api_key_set: !!(p.api_key || p.api_key_set),
+    };
+  });
+
+  res.json({ success: true, data: { ...data, providers, providers_map: providersMap } });
 });
 
 app.put('/api/email/providers', async (req, res) => {
