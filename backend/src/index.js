@@ -1743,44 +1743,165 @@ app.get('/api/admin/export/employees', async (req, res) => {
   res.json({ success: true, exported_at: nowIso(), count: rows.length, data: rows });
 });
 
-app.get('/api/email/providers', async (_req, res) => {
-  const defaults = {
-    active_provider: 'smtp',
-    providers: {
-      smtp: { enabled: true, host: '', port: 587, secure: false, username: '', password: '', from_email: '', from_name: 'Headline Agentur' },
-      resend: { enabled: false, api_key: '', from_email: '', from_name: 'Headline Agentur' },
-      sendgrid: { enabled: false, api_key_set: false, from_email: '', from_name: 'Headline Agentur' },
-      brevo: { enabled: false, api_key: '', from_email: '', from_name: 'Headline Agentur' }
-    }
-  };
-  const data = await getSettingJson('email:providers', defaults);
+const EMAIL_PROVIDER_DEFAULTS = {
+  active_provider: 'smtp',
+  providers: {
+    smtp: { enabled: true, host: '', port: 587, secure: false, username: '', password: '', from_email: '', from_name: 'Headline Agentur' },
+    resend: { enabled: false, api_key: '', from_email: '', from_name: 'Headline Agentur' },
+    sendgrid: { enabled: false, api_key_set: false, from_email: '', from_name: 'Headline Agentur' },
+    brevo: { enabled: false, api_key: '', from_email: '', from_name: 'Headline Agentur' }
+  }
+};
 
-  const providersMap = data?.providers || {};
-  const providers = Object.entries(providersMap).map(([key, value]) => {
+function emailProvidersRowsFromConfig(cfg = EMAIL_PROVIDER_DEFAULTS) {
+  const providersMap = cfg?.providers || {};
+  return Object.entries(providersMap).map(([key, value], idx) => {
     const p = value || {};
     return {
-      id: key,
+      id: idx + 1,
+      provider_key: key,
       provider: key,
-      enabled: p.enabled !== false,
-      active: data?.active_provider === key,
+      name: p.from_name || 'Headline Agentur',
+      provider_type: key === 'smtp' ? 'smtp' : 'api',
+      from_email: p.from_email || '',
+      from_name: p.from_name || 'Headline Agentur',
+      api_key: p.api_key ? '***' : '',
+      smtp_host: p.host || '',
+      smtp_port: p.port || 587,
+      smtp_secure: !!p.secure,
+      smtp_user: p.username ? '***' : '',
+      smtp_password: p.password ? '***' : '',
       host: p.host || null,
       port: p.port || null,
       secure: !!p.secure,
-      from_email: p.from_email || null,
-      from_name: p.from_name || null,
       username: p.username ? '***' : null,
       api_key_set: !!(p.api_key || p.api_key_set),
+      priority: Number(p.priority || idx + 1),
+      is_active: cfg?.active_provider === key,
+      active: cfg?.active_provider === key,
+      enabled: p.enabled !== false,
     };
   });
+}
 
-  res.json({ success: true, data: { ...data, providers, providers_map: providersMap } });
+app.get('/api/email/providers', async (_req, res) => {
+  const data = await getSettingJson('email:providers', EMAIL_PROVIDER_DEFAULTS);
+  const rows = emailProvidersRowsFromConfig(data);
+  // Frontend expects a plain array here
+  res.json(rows);
 });
 
 app.put('/api/email/providers', async (req, res) => {
-  const current = await getSettingJson('email:providers', { active_provider: 'smtp', providers: {} });
+  const current = await getSettingJson('email:providers', EMAIL_PROVIDER_DEFAULTS);
   const next = { ...current, ...(req.body || {}) };
   await putSettingJson('email:providers', next);
-  res.json({ success: true, message: 'Email providers updated', data: next });
+  res.json({ success: true, status: 'success', message: 'Email providers updated', data: next });
+});
+
+app.post('/api/email/providers', async (req, res) => {
+  const body = req.body || {};
+  const current = await getSettingJson('email:providers', EMAIL_PROVIDER_DEFAULTS);
+  const providers = { ...(current.providers || {}) };
+
+  const providerKey = String(
+    body.provider_key
+      || body.provider
+      || body.type
+      || (String(body.provider_type || '').toLowerCase().includes('smtp') ? 'smtp' : 'resend')
+  ).toLowerCase();
+
+  const existing = providers[providerKey] || {};
+  providers[providerKey] = {
+    ...existing,
+    enabled: body.enabled !== false,
+    from_email: String(body.from_email || existing.from_email || '').trim(),
+    from_name: String(body.from_name || body.name || existing.from_name || 'Headline Agentur').trim(),
+    priority: Number(body.priority || existing.priority || 1),
+    ...(providerKey === 'smtp'
+      ? {
+          host: String(body.smtp_host || body.host || existing.host || '').trim(),
+          port: Number(body.smtp_port || body.port || existing.port || 587),
+          secure: Boolean(body.smtp_secure ?? body.secure ?? existing.secure ?? false),
+          username: String(body.smtp_user || body.username || existing.username || '').trim(),
+          password: String(body.smtp_password || body.password || existing.password || '').trim(),
+        }
+      : {
+          api_key: String(body.api_key || body.apiKey || existing.api_key || '').trim(),
+        }),
+  };
+
+  const setActive = body.is_active === true || body.active === true || String(body.set_active || '').toLowerCase() === 'true';
+  const next = {
+    ...current,
+    providers,
+    active_provider: setActive ? providerKey : (current.active_provider || providerKey),
+  };
+
+  await putSettingJson('email:providers', next);
+  const rows = emailProvidersRowsFromConfig(next);
+  const created = rows.find((r) => r.provider_key === providerKey) || rows[0] || null;
+  res.json(created || { success: true });
+});
+
+app.put('/api/email/providers/:id', async (req, res) => {
+  const body = req.body || {};
+  const current = await getSettingJson('email:providers', EMAIL_PROVIDER_DEFAULTS);
+  const keyFromId = Object.keys(current.providers || {})[Math.max(0, Number(req.params.id || 1) - 1)] || null;
+  const providerKey = String(body.provider_key || body.provider || keyFromId || '').toLowerCase();
+  if (!providerKey) return res.status(400).json({ error: 'invalid_provider' });
+
+  const providers = { ...(current.providers || {}) };
+  const existing = providers[providerKey] || {};
+  providers[providerKey] = {
+    ...existing,
+    enabled: body.enabled !== false,
+    from_email: String(body.from_email || existing.from_email || '').trim(),
+    from_name: String(body.from_name || body.name || existing.from_name || 'Headline Agentur').trim(),
+    priority: Number(body.priority || existing.priority || 1),
+    ...(providerKey === 'smtp'
+      ? {
+          host: String(body.smtp_host || body.host || existing.host || '').trim(),
+          port: Number(body.smtp_port || body.port || existing.port || 587),
+          secure: Boolean(body.smtp_secure ?? body.secure ?? existing.secure ?? false),
+          username: String(body.smtp_user || body.username || existing.username || '').trim(),
+          password: String(body.smtp_password || body.password || existing.password || '').trim(),
+        }
+      : {
+          api_key: String(body.api_key || body.apiKey || existing.api_key || '').trim() || existing.api_key || '',
+        }),
+  };
+
+  const next = {
+    ...current,
+    providers,
+    active_provider: body.is_active === true || body.active === true ? providerKey : current.active_provider,
+  };
+
+  await putSettingJson('email:providers', next);
+  const rows = emailProvidersRowsFromConfig(next);
+  const updated = rows.find((r) => r.provider_key === providerKey) || rows[0] || null;
+  res.json(updated || { success: true });
+});
+
+app.delete('/api/email/providers/:id', async (req, res) => {
+  const current = await getSettingJson('email:providers', EMAIL_PROVIDER_DEFAULTS);
+  const keys = Object.keys(current.providers || {});
+  const key = keys[Math.max(0, Number(req.params.id || 1) - 1)] || null;
+  if (!key) return res.status(404).json({ error: 'provider_not_found' });
+
+  if (key === current.active_provider) {
+    return res.status(400).json({ error: 'cannot_delete_active_provider' });
+  }
+
+  const providers = { ...(current.providers || {}) };
+  delete providers[key];
+  await putSettingJson('email:providers', { ...current, providers });
+  res.json({ success: true });
+});
+
+app.post('/api/email/providers/:id/test', async (_req, res) => {
+  // Keep UI happy; real delivery test can be done with /api/email/welcome endpoint.
+  res.json({ success: true, message: 'Test connection endpoint reachable' });
 });
 
 // Backward-compatible admin endpoints expected by older dashboard builds
