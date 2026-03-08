@@ -895,6 +895,22 @@ app.post('/api/admin/users', async (req, res) => {
     res.status(201).json({ user: serializeAdminUser(created), starter_tasks: starterTasks });
   } catch (error) {
     if (String(error).includes('Unique constraint')) {
+      try {
+        const existing = await prisma.profile.findUnique({ where: { email }, include: { employee: true } });
+        if (existing) {
+          let starterTasks = null;
+          if (existing.role === 'user') {
+            try {
+              starterTasks = await assignStarterTasksToProfile(existing.id, 'registration_auto_existing');
+            } catch (err) {
+              console.error('[starter-tasks] auto-assign failed for existing profile:', err?.message || err);
+            }
+          }
+          return res.status(200).json({ user: serializeAdminUser(existing), existing: true, starter_tasks: starterTasks });
+        }
+      } catch (lookupErr) {
+        console.error('[admin/users] lookup existing by email failed:', lookupErr?.message || lookupErr);
+      }
       return res.status(409).json({ error: 'email already exists' });
     }
     res.status(500).json({ error: 'Failed to create user', details: String(error) });
