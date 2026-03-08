@@ -3080,6 +3080,52 @@ async function assignStarterTasksToProfile(profileId, createdBy = 'kyc_approved_
   return { assigned_count: Math.max(created.length, dbCreated), assignment_ids: created, due_date: dueDate };
 }
 
+app.post('/api/admin/starter-tasks/backfill', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const limit = Math.max(1, Math.min(Number(body.limit || 200), 2000));
+    const profileIds = Array.isArray(body.profile_ids) ? body.profile_ids.map((v) => String(v || '').trim()).filter(Boolean) : [];
+
+    const where = {
+      role: 'user',
+      ...(profileIds.length ? { id: { in: profileIds } } : {}),
+    };
+
+    const profiles = await prisma.profile.findMany({
+      where,
+      select: { id: true, email: true, role: true },
+      take: limit,
+      orderBy: { createdAt: 'desc' },
+    });
+
+    let processed = 0;
+    let totalAssigned = 0;
+    const details = [];
+
+    for (const p of profiles) {
+      try {
+        const result = await assignStarterTasksToProfile(p.id, 'starter_backfill_admin');
+        processed += 1;
+        totalAssigned += Number(result?.assigned_count || 0);
+        details.push({ profile_id: p.id, email: p.email, assigned_count: Number(result?.assigned_count || 0) });
+      } catch (err) {
+        processed += 1;
+        details.push({ profile_id: p.id, email: p.email, assigned_count: 0, error: String(err?.message || err) });
+      }
+    }
+
+    return res.json({
+      success: true,
+      scanned: profiles.length,
+      processed,
+      total_assigned: totalAssigned,
+      details,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Starter-task backfill failed', error: String(error) });
+  }
+});
+
 app.get('/api/public/job-listings', async (_req, res) => {
   try {
     const jobs = await getJobListings();
