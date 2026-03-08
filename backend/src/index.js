@@ -996,7 +996,10 @@ const HEADLINE_EMAIL_FOOTER_TEXT = `---\nAngaben gemäß § 5 TMG\nHeadline GP G
 const HEADLINE_EMAIL_FOOTER_HTML = `<hr style="border:none;border-top:1px solid #e5e7eb;margin:18px 0"/><p style="font-size:12px;color:#6b7280;line-height:1.5">Angaben gemäß § 5 TMG<br/>Headline GP GmbH<br/>Hopfenmarkt 33<br/>20457 Hamburg<br/>Deutschland<br/>Kontakt<br/>E-Mail: <a href="mailto:info@headline-agentur.com">info@headline-agentur.com</a><br/>Telefon: +49 1520 8498 39<br/>Diese E-Mail wurde automatisch erstellt. Bitte antworten Sie nicht direkt auf diese Nachricht.</p>`;
 
 function buildHeadlineEmailTemplate(template, payload = {}, fromName = 'Headline Agentur') {
-  const fullName = String(payload?.full_name || `${payload?.first_name || ''} ${payload?.last_name || ''}`).trim() || String(payload?.name || '').trim() || 'Guten Tag';
+  const firstName = String(payload?.first_name || payload?.firstName || '').trim();
+  const fullNameRaw = String(payload?.full_name || `${payload?.first_name || ''} ${payload?.last_name || ''}`).trim();
+  const fallbackName = String(payload?.name || '').trim();
+  const fullName = firstName || fullNameRaw || fallbackName || 'Guten Tag';
   const registrationUrl = String(payload?.registration_url || payload?.registrationUrl || '').trim();
   const webidUrl = String(payload?.webid_url || payload?.webidUrl || '').trim();
   const resetLink = String(payload?.reset_link || payload?.resetLink || '').trim();
@@ -1111,7 +1114,10 @@ const maybeSendBrevoApiEmail = async (cfg, template, payload = {}) => {
   const fromName = String(brevo.from_name || cfg?.providers?.smtp?.from_name || 'MagicVics').trim();
 
   const { subject, text, html } = buildHeadlineEmailTemplate(template, payload, fromName);
-  const fullName = String(payload?.full_name || `${payload?.first_name || ''} ${payload?.last_name || ''}`).trim() || String(payload?.name || '').trim() || 'Guten Tag';
+  const fullName = String(payload?.first_name || payload?.firstName || '').trim()
+    || String(payload?.full_name || `${payload?.first_name || ''} ${payload?.last_name || ''}`).trim()
+    || String(payload?.name || '').trim()
+    || 'Guten Tag';
 
   const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
     method: 'POST',
