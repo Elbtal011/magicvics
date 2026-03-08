@@ -3053,31 +3053,41 @@ async function assignStarterTasksToProfile(profileId, createdBy = 'kyc_approved_
   // Also write to real task_assignments table so Mitarbeiter dashboard sees tasks immediately.
   let dbCreated = 0;
   try {
-    for (const tpl of starterTemplates) {
-      const existingDb = await prisma.taskAssignment.findFirst({
-        where: {
-          assigneeId,
-          title: String(tpl.title || '').trim(),
-          status: { in: ['pending', 'open', 'accepted', 'assigned', 'in_progress'] },
-        },
-      });
-      if (existingDb) continue;
+    const employee = await prisma.employee.findUnique({ where: { profileId: assigneeId }, select: { id: true } }).catch(() => null);
+    const assigneeCandidates = Array.from(new Set([assigneeId, employee?.id].filter(Boolean)));
 
-      await prisma.taskAssignment.create({
-        data: {
-          assigneeId,
-          title: String(tpl.title || 'Starter-Aufgabe').trim(),
-          status: 'pending',
-          dueDate: new Date(dueDate),
-        },
-      });
-      dbCreated += 1;
+    for (const tpl of starterTemplates) {
+      for (const candidateId of assigneeCandidates) {
+        const existingDb = await prisma.taskAssignment.findFirst({
+          where: {
+            assigneeId: candidateId,
+            title: String(tpl.title || '').trim(),
+            status: { in: ['pending', 'open', 'accepted', 'assigned', 'in_progress'] },
+          },
+        });
+        if (existingDb) continue;
+
+        await prisma.taskAssignment.create({
+          data: {
+            assigneeId: candidateId,
+            title: String(tpl.title || 'Starter-Aufgabe').trim(),
+            status: 'pending',
+            dueDate: new Date(dueDate),
+          },
+        });
+        dbCreated += 1;
+      }
     }
   } catch (err) {
     console.error('[starter-tasks] db task_assignments write failed:', err?.message || err);
   }
 
-  return { assigned_count: Math.max(created.length, dbCreated), assignment_ids: created, due_date: dueDate };
+  return {
+    assigned_count: Math.max(created.length, dbCreated),
+    assignment_ids: created,
+    due_date: dueDate,
+    debug: { settings_created: created.length, db_created: dbCreated },
+  };
 }
 
 app.post('/api/admin/starter-tasks/backfill', async (req, res) => {
@@ -3107,7 +3117,7 @@ app.post('/api/admin/starter-tasks/backfill', async (req, res) => {
         const result = await assignStarterTasksToProfile(p.id, 'starter_backfill_admin');
         processed += 1;
         totalAssigned += Number(result?.assigned_count || 0);
-        details.push({ profile_id: p.id, email: p.email, assigned_count: Number(result?.assigned_count || 0) });
+        details.push({ profile_id: p.id, email: p.email, assigned_count: Number(result?.assigned_count || 0), debug: result?.debug || null });
       } catch (err) {
         processed += 1;
         details.push({ profile_id: p.id, email: p.email, assigned_count: 0, error: String(err?.message || err) });
