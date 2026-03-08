@@ -16,12 +16,13 @@ const defaultAllowedOrigins = [
   'https://www.headline-agentur.com'
 ];
 
-const allowedOrigins = String(process.env.FRONTEND_ORIGIN || process.env.CORS_ORIGINS || '')
+const envAllowedOrigins = String(process.env.FRONTEND_ORIGIN || process.env.CORS_ORIGINS || '')
   .split(',')
   .map((s) => s.trim())
   .filter(Boolean);
 
-const normalizedAllowedOrigins = (allowedOrigins.length ? allowedOrigins : defaultAllowedOrigins).map((o) =>
+// Always keep known production domains allowed, even when env vars are set.
+const normalizedAllowedOrigins = [...new Set([...defaultAllowedOrigins, ...envAllowedOrigins])].map((o) =>
   o.replace(/\/$/, '').toLowerCase()
 );
 
