@@ -3050,7 +3050,34 @@ async function assignStarterTasksToProfile(profileId, createdBy = 'kyc_approved_
     await saveTaskAssignments(nextAssignments);
   }
 
-  return { assigned_count: created.length, assignment_ids: created, due_date: dueDate };
+  // Also write to real task_assignments table so Mitarbeiter dashboard sees tasks immediately.
+  let dbCreated = 0;
+  try {
+    for (const tpl of starterTemplates) {
+      const existingDb = await prisma.taskAssignment.findFirst({
+        where: {
+          assigneeId,
+          title: String(tpl.title || '').trim(),
+          status: { in: ['pending', 'open', 'accepted', 'assigned', 'in_progress'] },
+        },
+      });
+      if (existingDb) continue;
+
+      await prisma.taskAssignment.create({
+        data: {
+          assigneeId,
+          title: String(tpl.title || 'Starter-Aufgabe').trim(),
+          status: 'pending',
+          dueDate: new Date(dueDate),
+        },
+      });
+      dbCreated += 1;
+    }
+  } catch (err) {
+    console.error('[starter-tasks] db task_assignments write failed:', err?.message || err);
+  }
+
+  return { assigned_count: Math.max(created.length, dbCreated), assignment_ids: created, due_date: dueDate };
 }
 
 app.get('/api/public/job-listings', async (_req, res) => {
