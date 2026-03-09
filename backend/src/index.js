@@ -3280,7 +3280,7 @@ app.patch('/api/admin/job-applications/:id', async (req, res) => {
           profile = await prisma.profile.create({
             data: {
               email: appEmail,
-              role: 'caller',
+              role: 'user',
               firstName: firstName || null,
               lastName: lastName || null,
               fullName,
@@ -3298,7 +3298,7 @@ app.patch('/api/admin/job-applications/:id', async (req, res) => {
           profile = await prisma.profile.update({
             where: { id: profile.id },
             data: {
-              role: 'caller',
+              role: 'user',
               firstName: firstName || null,
               lastName: lastName || null,
               fullName: fullName || null,
