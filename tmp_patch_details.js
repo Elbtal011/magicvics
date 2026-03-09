@@ -1,0 +1,14 @@
+const fs=require('fs');
+const p='C:/Users/user/.openclaw/workspace/magicvics-mirror/assets/JobApplicationDetails--c6Llsh2.js';
+let s=fs.readFileSync(p,'utf8');
+const before=s;
+
+s=s.replace(/w=async\(\)=>\{if\(o\)try\{F\(!0\),L\(null\);const\{data:r,error:s\}=await c\.from\("job_applications"\)\.select\("\*"\)\.eq\("id",o\)\.single\(\);if\(s\)throw s\.code==="PGRST116"\?new Error\("Bewerbung nicht gefunden"\):s;I\(\{\.\.\.r,job_listing:null\}\),N\(r\.admin_notes\|\|""\),b\(!1\)\}catch\(r\)\{console\.error\("Error fetching application:",r\),L\(r\.message\|\|"Fehler beim Laden der Bewerbung"\),n\(\{type:"error",title:"Fehler",message:r\.message\|\|"Bewerbung konnte nicht geladen werden\."\}\)\}finally\{F\(!1\)\}\}/,
+"w=async()=>{if(o)try{F(!0),L(null);const r=await fetch('/api/admin/job-applications',{credentials:'include'}),s=await r.json();if(!r.ok||!(s!=null&&s.success)||!Array.isArray(s.data))throw new Error((s==null?void 0:s.message)||'Bewerbung konnte nicht geladen werden.');const h=(s.data||[]).find(u=>String(u.id)===String(o));if(!h)throw new Error('Bewerbung nicht gefunden');I({...h,job_listing:h.job_listing||null}),N(h.admin_notes||\"\"),b(!1)}catch(r){console.error(\"Error fetching application:\",r),L(r.message||\"Fehler beim Laden der Bewerbung\"),n({type:\"error\",title:\"Fehler\",message:r.message||\"Bewerbung konnte nicht geladen werden.\"})}finally{F(!1)}}");
+
+s=s.replace(/Y=async\(\)=>\{if\(t\)try\{R\(!0\);const\{error:r\}=await c\.from\("job_applications"\)\.update\(\{admin_notes:O,updated_at:new Date\(\)\.toISOString\(\)\}\)\.eq\("id",t\.id\);if\(r\)throw r;b\(!1\),n\(\{type:"success",title:"Gespeichert",message:"Interne Notizen wurden gespeichert\."\}\)\}catch\(r\)\{console\.error\("Error saving notes:",r\),n\(\{type:"error",title:"Fehler",message:"Notizen konnten nicht gespeichert werden\."\}\)\}finally\{R\(!1\)\}\}/,
+"Y=async()=>{if(t)try{R(!0);const r=await fetch('/api/admin/job-applications/'+t.id,{method:'PATCH',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({admin_notes:O})}),s=await r.json().catch(()=>({}));if(!r.ok||!(s!=null&&s.success))throw new Error((s==null?void 0:s.message)||'Notizen konnten nicht gespeichert werden.');b(!1),n({type:\"success\",title:\"Gespeichert\",message:\"Interne Notizen wurden gespeichert.\"})}catch(r){console.error(\"Error saving notes:\",r),n({type:\"error\",title:\"Fehler\",message:\"Notizen konnten nicht gespeichert werden.\"})}finally{R(!1)}}");
+
+if(s===before){console.log('no changes'); process.exit(1);} 
+fs.writeFileSync(p,s);
+console.log('patched details bundle');
