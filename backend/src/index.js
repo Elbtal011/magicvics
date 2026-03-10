@@ -1022,6 +1022,12 @@ app.delete('/api/admin/users/:id', async (req, res) => {
 
     const profileId = existing.id;
     const email = String(existing.email || '').trim().toLowerCase();
+    const role = String(existing.role || '').trim().toLowerCase();
+
+    // Safety: admin accounts must never be deleted from this endpoint.
+    if (role === 'admin') {
+      return res.status(403).json({ error: 'Admin users cannot be deleted' });
+    }
 
     await prisma.$transaction(async (tx) => {
       // Explicit employee cleanup (profile delete also cascades, but keep this robust)
