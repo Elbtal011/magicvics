@@ -46,6 +46,102 @@
             headers: { 'content-type': 'application/json' }
           });
         }
+
+        // Contracts migration bridge: route legacy Supabase REST calls to backend API.
+        if (url.includes('/rest/v1/contracts') || url.includes('/rest/v1/contract_assignments')) {
+          const method = String(init?.method || 'GET').toUpperCase();
+          const u = new URL(url, location.origin);
+          const isContracts = u.pathname.includes('/rest/v1/contracts');
+          const base = isContracts ? '/api/admin/contracts' : '/api/admin/contract-assignments';
+
+          const eq = (name) => {
+            const raw = u.searchParams.get(name) || '';
+            if (!raw.startsWith('eq.')) return '';
+            return decodeURIComponent(raw.slice(3));
+          };
+
+          const targetId = eq('id');
+
+          // GET list/single
+          if (method === 'GET') {
+            const qp = new URLSearchParams();
+            const id = eq('id');
+            const isTemplate = eq('is_template');
+            const parentId = eq('parent_id');
+            const userId = eq('user_id');
+            const contractId = eq('contract_id');
+            if (id) qp.set('id', id);
+            if (isTemplate) qp.set('is_template', isTemplate);
+            if (parentId) qp.set('parent_id', parentId);
+            if (userId) qp.set('user_id', userId);
+            if (contractId) qp.set('contract_id', contractId);
+
+            const apiResp = await originalFetch(`${base}${qp.toString() ? `?${qp.toString()}` : ''}`, {
+              method: 'GET',
+              credentials: 'include'
+            });
+            const payload = await apiResp.json().catch(() => ({}));
+            const rows = Array.isArray(payload?.data) ? payload.data : [];
+            const single = !!u.searchParams.get('limit') && String(u.searchParams.get('limit')) === '1' && !u.searchParams.get('select')?.includes('*,');
+            return new Response(JSON.stringify(single ? (rows[0] || null) : rows), {
+              status: apiResp.ok ? 200 : apiResp.status,
+              headers: { 'content-type': 'application/json' }
+            });
+          }
+
+          // INSERT
+          if (method === 'POST') {
+            const rawBody = typeof init?.body === 'string' ? init.body : '{}';
+            const body = JSON.parse(rawBody || '{}');
+            const row = Array.isArray(body) ? body[0] : body;
+            const apiResp = await originalFetch(base, {
+              method: 'POST',
+              credentials: 'include',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify(row || {})
+            });
+            const payload = await apiResp.json().catch(() => ({}));
+            const created = payload?.data || null;
+            return new Response(JSON.stringify(created ? [created] : []), {
+              status: apiResp.ok ? 201 : apiResp.status,
+              headers: { 'content-type': 'application/json' }
+            });
+          }
+
+          // UPDATE
+          if (method === 'PATCH' || method === 'PUT') {
+            const id = targetId;
+            if (!id) return new Response(JSON.stringify({ message: 'Missing id filter' }), { status: 400 });
+            const rawBody = typeof init?.body === 'string' ? init.body : '{}';
+            const body = JSON.parse(rawBody || '{}');
+            const apiResp = await originalFetch(`${base}/${encodeURIComponent(id)}`, {
+              method: 'PATCH',
+              credentials: 'include',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify(body || {})
+            });
+            const payload = await apiResp.json().catch(() => ({}));
+            const updated = payload?.data || null;
+            return new Response(JSON.stringify(updated ? [updated] : []), {
+              status: apiResp.ok ? 200 : apiResp.status,
+              headers: { 'content-type': 'application/json' }
+            });
+          }
+
+          // DELETE
+          if (method === 'DELETE') {
+            const id = targetId;
+            if (!id) return new Response(JSON.stringify({ message: 'Missing id filter' }), { status: 400 });
+            const apiResp = await originalFetch(`${base}/${encodeURIComponent(id)}`, {
+              method: 'DELETE',
+              credentials: 'include'
+            });
+            return new Response(JSON.stringify([]), {
+              status: apiResp.ok ? 200 : apiResp.status,
+              headers: { 'content-type': 'application/json' }
+            });
+          }
+        }
       } catch (_e) {
         // fall through to real fetch
       }

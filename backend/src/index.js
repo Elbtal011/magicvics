@@ -1753,6 +1753,163 @@ const putSettingJson = async (key, value) => {
   return prisma.setting.upsert({ where: { key }, update: { value }, create: { key, value } });
 };
 
+const CONTRACTS_KEY = 'contracts:data';
+const CONTRACT_ASSIGNMENTS_KEY = 'contracts:assignments';
+
+const newId = (prefix = 'id') => `${prefix}_${Math.random().toString(36).slice(2, 10)}`;
+
+const normalizeContract = (row = {}) => ({
+  id: String(row.id || newId('ctr')).trim(),
+  title: String(row.title || '').trim(),
+  category: String(row.category || '').trim(),
+  content: String(row.content || '').trim(),
+  is_active: row.is_active !== false,
+  is_template: row.is_template !== false,
+  parent_id: row.parent_id || null,
+  version: String(row.version || '1.0').trim(),
+  version_number: Number.isFinite(Number(row.version_number)) ? Number(row.version_number) : 1,
+  template_data: row.template_data && typeof row.template_data === 'object' ? row.template_data : {},
+  created_by: row.created_by || null,
+  created_at: row.created_at || nowIso(),
+  updated_at: nowIso()
+});
+
+const normalizeContractAssignment = (row = {}) => ({
+  id: String(row.id || newId('ca')).trim(),
+  contract_id: String(row.contract_id || '').trim(),
+  user_id: String(row.user_id || '').trim(),
+  assigned_at: row.assigned_at || nowIso(),
+  signed_at: row.signed_at || null,
+  status: String(row.status || 'pending').trim(),
+  signature_data: row.signature_data ?? null,
+  created_at: row.created_at || nowIso(),
+  updated_at: nowIso()
+});
+
+async function getContracts() {
+  const data = await getSettingJson(CONTRACTS_KEY, { contracts: [] });
+  const rows = Array.isArray(data?.contracts) ? data.contracts : Array.isArray(data) ? data : [];
+  return rows.map(normalizeContract);
+}
+
+async function saveContracts(rows) {
+  const contracts = rows.map(normalizeContract);
+  await putSettingJson(CONTRACTS_KEY, { contracts, updated_at: nowIso() });
+  return contracts;
+}
+
+async function getContractAssignments() {
+  const data = await getSettingJson(CONTRACT_ASSIGNMENTS_KEY, { assignments: [] });
+  const rows = Array.isArray(data?.assignments) ? data.assignments : Array.isArray(data) ? data : [];
+  return rows.map(normalizeContractAssignment);
+}
+
+async function saveContractAssignments(rows) {
+  const assignments = rows.map(normalizeContractAssignment);
+  await putSettingJson(CONTRACT_ASSIGNMENTS_KEY, { assignments, updated_at: nowIso() });
+  return assignments;
+}
+
+app.get('/api/admin/contracts', async (req, res) => {
+  const id = String(req.query.id || '').trim();
+  const isTemplate = req.query.is_template;
+  const parentId = String(req.query.parent_id || '').trim();
+
+  let rows = await getContracts();
+  if (id) rows = rows.filter((r) => r.id === id);
+  if (isTemplate !== undefined) {
+    const flag = String(isTemplate).toLowerCase() === 'true';
+    rows = rows.filter((r) => Boolean(r.is_template) === flag);
+  }
+  if (parentId) rows = rows.filter((r) => String(r.parent_id || '') === parentId);
+
+  rows.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+  res.json({ success: true, data: rows });
+});
+
+app.post('/api/admin/contracts', async (req, res) => {
+  const body = req.body || {};
+  const current = await getContracts();
+  const created = normalizeContract(body);
+  current.push(created);
+  await saveContracts(current);
+  res.json({ success: true, data: created });
+});
+
+app.patch('/api/admin/contracts/:id', async (req, res) => {
+  const id = String(req.params.id || '').trim();
+  const body = req.body || {};
+  const current = await getContracts();
+  const idx = current.findIndex((r) => r.id === id);
+  if (idx < 0) return res.status(404).json({ error: 'Contract not found' });
+
+  const next = { ...current[idx], ...body, id: current[idx].id, updated_at: nowIso() };
+  current[idx] = normalizeContract(next);
+  await saveContracts(current);
+  res.json({ success: true, data: current[idx] });
+});
+
+app.delete('/api/admin/contracts/:id', async (req, res) => {
+  const id = String(req.params.id || '').trim();
+  const current = await getContracts();
+
+  // Clear parent links for child contracts before deletion.
+  const normalized = current.map((r) => (r.parent_id === id ? { ...r, parent_id: null, updated_at: nowIso() } : r));
+  const next = normalized.filter((r) => r.id !== id);
+  await saveContracts(next);
+  res.json({ success: true });
+});
+
+app.get('/api/admin/contract-assignments', async (req, res) => {
+  const id = String(req.query.id || '').trim();
+  const userId = String(req.query.user_id || '').trim();
+  const contractId = String(req.query.contract_id || '').trim();
+
+  const [assignments, contracts] = await Promise.all([getContractAssignments(), getContracts()]);
+  const contractMap = new Map(contracts.map((c) => [c.id, c]));
+
+  let rows = assignments;
+  if (id) rows = rows.filter((r) => r.id === id);
+  if (userId) rows = rows.filter((r) => r.user_id === userId);
+  if (contractId) rows = rows.filter((r) => r.contract_id === contractId);
+
+  rows = rows
+    .map((r) => ({ ...r, contract: contractMap.get(r.contract_id) || null }))
+    .sort((a, b) => new Date(b.assigned_at || 0).getTime() - new Date(a.assigned_at || 0).getTime());
+
+  res.json({ success: true, data: rows });
+});
+
+app.post('/api/admin/contract-assignments', async (req, res) => {
+  const body = req.body || {};
+  const current = await getContractAssignments();
+  const created = normalizeContractAssignment(body);
+  current.push(created);
+  await saveContractAssignments(current);
+  res.json({ success: true, data: created });
+});
+
+app.patch('/api/admin/contract-assignments/:id', async (req, res) => {
+  const id = String(req.params.id || '').trim();
+  const body = req.body || {};
+  const current = await getContractAssignments();
+  const idx = current.findIndex((r) => r.id === id);
+  if (idx < 0) return res.status(404).json({ error: 'Contract assignment not found' });
+
+  const next = { ...current[idx], ...body, id: current[idx].id, updated_at: nowIso() };
+  current[idx] = normalizeContractAssignment(next);
+  await saveContractAssignments(current);
+  res.json({ success: true, data: current[idx] });
+});
+
+app.delete('/api/admin/contract-assignments/:id', async (req, res) => {
+  const id = String(req.params.id || '').trim();
+  const current = await getContractAssignments();
+  const next = current.filter((r) => r.id !== id);
+  await saveContractAssignments(next);
+  res.json({ success: true });
+});
+
 app.post('/api/balance/approve-task-payment', async (req, res) => {
   const body = req.body || {};
   const taskId = body.taskId || body.task_id || null;
