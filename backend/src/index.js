@@ -1006,10 +1006,25 @@ app.patch('/api/admin/users/:id', async (req, res) => {
 
 app.delete('/api/admin/users/:id', async (req, res) => {
   const id = req.params.id;
-  const existing = await findProfileByAnyId(id);
-  if (!existing) return res.status(404).json({ error: 'User not found' });
-  await prisma.profile.delete({ where: { id: existing.id } });
-  res.json({ success: true, message: 'User deleted' });
+
+  // Make deletion idempotent: frontend cleanup may have already removed the profile
+  // before calling this endpoint. "Not found" should not break employee deletion flow.
+  try {
+    const existing = await findProfileByAnyId(id);
+    if (!existing) {
+      return res.json({ success: true, message: 'User already deleted' });
+    }
+
+    await prisma.profile.delete({ where: { id: existing.id } });
+    return res.json({ success: true, message: 'User deleted' });
+  } catch (error) {
+    // Prisma "record not found" safety net
+    if (error && error.code === 'P2025') {
+      return res.json({ success: true, message: 'User already deleted' });
+    }
+    console.error('Error deleting admin user:', error);
+    return res.status(500).json({ error: 'Failed to delete user' });
+  }
 });
 
 app.post('/api/balance/add-bonus', async (req, res) => {
