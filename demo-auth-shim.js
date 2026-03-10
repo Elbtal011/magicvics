@@ -5,6 +5,15 @@
   // get_profiles_with_emails_complete, serve canonical data from /api/admin/users.
   // This keeps Employees UI consistent with deletion/edit API without enabling demo mode.
   if (!DEMO_MODE) {
+    // Hard route normalization: contracts UI should live under settings -> Verträge tab.
+    try {
+      const p = String(location.pathname || '');
+      if (p === '/admin/contracts' || p.startsWith('/admin/contracts/')) {
+        location.replace('/admin/settings?tab=vertraege');
+        return;
+      }
+    } catch {}
+
     const originalFetch = window.fetch.bind(window);
     const mapUsersToLegacyProfiles = (users) =>
       (Array.isArray(users) ? users : []).map((u) => ({
