@@ -1,6 +1,60 @@
 ﻿(() => {
   const DEMO_MODE = /^(localhost|127\.0\.0\.1)$/.test(location.hostname); // Enable demo shim only for local dev.
-  if (!DEMO_MODE) return;
+
+  // Production safety bridge: if any legacy client code still calls the Supabase RPC
+  // get_profiles_with_emails_complete, serve canonical data from /api/admin/users.
+  // This keeps Employees UI consistent with deletion/edit API without enabling demo mode.
+  if (!DEMO_MODE) {
+    const originalFetch = window.fetch.bind(window);
+    const mapUsersToLegacyProfiles = (users) =>
+      (Array.isArray(users) ? users : []).map((u) => ({
+        id: u.id,
+        first_name: u.first_name || u.user_metadata?.first_name || '',
+        last_name: u.last_name || u.user_metadata?.last_name || '',
+        email: u.email || '',
+        role: u.role || 'user'
+      }));
+
+    window.fetch = async (input, init = {}) => {
+      try {
+        const raw = typeof input === 'string' ? input : input?.url || '';
+        const url = String(raw || '');
+
+        if (
+          url.includes('/rest/v1/rpc/get_profiles_with_emails_complete') ||
+          url.includes('/rest/v1/rpc/get_profiles_with_emails_by_ids')
+        ) {
+          const apiResp = await originalFetch('/api/admin/users', {
+            method: 'GET',
+            credentials: 'include'
+          });
+          const payload = await apiResp.json().catch(() => ({}));
+          let rows = mapUsersToLegacyProfiles(payload?.users || []);
+
+          if (url.includes('/rest/v1/rpc/get_profiles_with_emails_by_ids')) {
+            const bodyText = typeof init?.body === 'string' ? init.body : '{}';
+            const body = JSON.parse(bodyText || '{}');
+            const ids = body.profile_ids || body.ids || [];
+            if (Array.isArray(ids) && ids.length > 0) {
+              const idSet = new Set(ids.map(String));
+              rows = rows.filter((r) => idSet.has(String(r.id)));
+            }
+          }
+
+          return new Response(JSON.stringify(rows), {
+            status: 200,
+            headers: { 'content-type': 'application/json' }
+          });
+        }
+      } catch (_e) {
+        // fall through to real fetch
+      }
+
+      return originalFetch(input, init);
+    };
+
+    return;
+  }
 
   const DEMO_FLAG_KEY = 'MV_DEMO_AUTH';
   localStorage.setItem(DEMO_FLAG_KEY, '1');
