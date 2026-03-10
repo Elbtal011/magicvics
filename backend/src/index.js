@@ -814,6 +814,9 @@ const serializeAdminUser = (profile) => {
 };
 
 app.get('/api/admin/users', async (req, res) => {
+  // Avoid stale employee/user lists via CDN/browser caches.
+  res.set('Cache-Control', 'no-store');
+
   const role = (req.query.role || '').toString().trim();
   const q = (req.query.q || '').toString().trim();
 
@@ -1620,6 +1623,8 @@ app.get('/api/telegram/history', async (_req, res) => {
 
 // Minimal Supabase REST/RPC compatibility for demos that still call those shapes.
 app.post('/rpc/get_profiles_with_emails_complete', async (_req, res) => {
+  // Employee page consumes this RPC heavily; force fresh reads.
+  res.set('Cache-Control', 'no-store');
   const profiles = await prisma.profile.findMany({ orderBy: { createdAt: 'desc' } });
   const data = profiles.map((p) => ({
     id: p.id,
@@ -3225,6 +3230,8 @@ app.delete('/api/admin/job-listings/:id', async (req, res) => {
 });
 
 app.get('/api/admin/job-applications', async (_req, res) => {
+  // Avoid stale job-application lists after deletions.
+  res.set('Cache-Control', 'no-store');
   try {
     const [rows, jobs] = await Promise.all([getJobApplications(), getJobListings()]);
     const bySlug = new Map(jobs.map((j) => [String(j.slug || ''), j]));
