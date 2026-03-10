@@ -82,7 +82,22 @@
             });
             const payload = await apiResp.json().catch(() => ({}));
             const rows = Array.isArray(payload?.data) ? payload.data : [];
-            const single = !!u.searchParams.get('limit') && String(u.searchParams.get('limit')) === '1' && !u.searchParams.get('select')?.includes('*,');
+
+            const acceptHeader = (() => {
+              try {
+                const h = init && init.headers;
+                if (!h) return '';
+                if (typeof h.get === 'function') return String(h.get('accept') || h.get('Accept') || '').toLowerCase();
+                return String(h.Accept || h.accept || '').toLowerCase();
+              } catch {
+                return '';
+              }
+            })();
+            const wantsObject = acceptHeader.includes('application/vnd.pgrst.object+json');
+            const singleByLimit = String(u.searchParams.get('limit') || '') === '1';
+            const singleByEqId = !!id;
+            const single = wantsObject || singleByLimit || singleByEqId;
+
             return new Response(JSON.stringify(single ? (rows[0] || null) : rows), {
               status: apiResp.ok ? 200 : apiResp.status,
               headers: { 'content-type': 'application/json' }
