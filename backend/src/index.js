@@ -1007,16 +1007,38 @@ app.patch('/api/admin/users/:id', async (req, res) => {
 app.delete('/api/admin/users/:id', async (req, res) => {
   const id = req.params.id;
 
-  // Make deletion idempotent: frontend cleanup may have already removed the profile
-  // before calling this endpoint. "Not found" should not break employee deletion flow.
+  // Idempotent + comprehensive cleanup:
+  // - remove employee row (if present)
+  // - remove profile row
+  // - remove linked job applications by email
   try {
     const existing = await findProfileByAnyId(id);
     if (!existing) {
       return res.json({ success: true, message: 'User already deleted' });
     }
 
-    await prisma.profile.delete({ where: { id: existing.id } });
-    return res.json({ success: true, message: 'User deleted' });
+    const profileId = existing.id;
+    const email = String(existing.email || '').trim().toLowerCase();
+
+    await prisma.$transaction(async (tx) => {
+      // Explicit employee cleanup (profile delete also cascades, but keep this robust)
+      await tx.employee.deleteMany({ where: { profileId } });
+      await tx.profile.deleteMany({ where: { id: profileId } });
+    });
+
+    let removedApplications = 0;
+    if (email) {
+      const currentApps = await getJobApplications();
+      const nextApps = currentApps.filter((app) => String(app?.email || '').trim().toLowerCase() !== email);
+      removedApplications = currentApps.length - nextApps.length;
+      if (removedApplications > 0) await saveJobApplications(nextApps);
+    }
+
+    return res.json({
+      success: true,
+      message: 'User deleted',
+      cleanup: { profile_id: profileId, email, removed_job_applications: removedApplications }
+    });
   } catch (error) {
     // Prisma "record not found" safety net
     if (error && error.code === 'P2025') {
