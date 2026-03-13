@@ -166,6 +166,30 @@
             });
           }
         }
+
+        // Bewerbungen (job applications) migration bridge: route legacy Supabase deletes to backend API.
+        if (url.includes('/rest/v1/job_applications')) {
+          const method = String(init?.method || 'GET').toUpperCase();
+          const u = new URL(url, location.origin);
+          const eq = (name) => {
+            const raw = u.searchParams.get(name) || '';
+            if (!raw.startsWith('eq.')) return '';
+            return decodeURIComponent(raw.slice(3));
+          };
+          const id = eq('id');
+
+          if (method === 'DELETE') {
+            if (!id) return new Response(JSON.stringify({ message: 'Missing id filter' }), { status: 400 });
+            const apiResp = await originalFetch(`/api/admin/job-applications/${encodeURIComponent(id)}`, {
+              method: 'DELETE',
+              credentials: 'include'
+            });
+            return new Response(JSON.stringify([]), {
+              status: apiResp.ok ? 200 : apiResp.status,
+              headers: { 'content-type': 'application/json' }
+            });
+          }
+        }
       } catch (_e) {
         // fall through to real fetch
       }
