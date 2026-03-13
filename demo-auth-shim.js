@@ -190,6 +190,17 @@
             });
           }
         }
+
+        // legacy email_queue deletions (Supabase) should be ignored — backend cleans related data.
+        if (url.includes('/rest/v1/email_queue')) {
+          const method = String(init?.method || 'GET').toUpperCase();
+          if (method === 'DELETE') {
+            return new Response(JSON.stringify([]), {
+              status: 200,
+              headers: { 'content-type': 'application/json' }
+            });
+          }
+        }
       } catch (_e) {
         // fall through to real fetch
       }
