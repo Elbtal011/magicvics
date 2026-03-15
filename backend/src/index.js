@@ -1320,6 +1320,43 @@ const safeMessageAck = async (channel, template, payload = {}) => {
   };
   const next = [...log.slice(-99), event];
   await prisma.setting.upsert({ where: { key }, update: { value: { events: next } }, create: { key, value: { events: next } } });
+
+  // Persist email logs for admin history UI.
+  if (String(channel).toLowerCase() === 'email') {
+    try {
+      const row = await prisma.setting.findUnique({ where: { key: 'email:providers' } });
+      const cfg = row?.value || {};
+      const fromName = String(
+        cfg?.providers?.resend?.from_name
+        || cfg?.providers?.smtp?.from_name
+        || cfg?.providers?.brevo?.from_name
+        || 'Headline Agentur'
+      ).trim();
+      const { subject } = buildHeadlineEmailTemplate(template, payload, fromName);
+      const to = String(payload?.to || payload?.email || '').trim();
+
+      const entry = {
+        id: `elog_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
+        created_at: nowIso(),
+        email_type: template,
+        recipient_email: to || null,
+        subject: subject || '',
+        status: delivery?.sent ? 'sent' : 'failed',
+        provider_name: delivery?.provider || cfg?.active_provider || 'unknown',
+        message_id: delivery?.message_id || null,
+        error_message: delivery?.sent ? null : (delivery?.error || delivery?.reason || 'send_failed'),
+        delivered_at: null,
+        opened_at: null,
+        clicked_at: null,
+      };
+
+      const logs = await getEmailLogs();
+      await saveEmailLogs([entry, ...logs].slice(0, 2000));
+    } catch (err) {
+      console.warn('Failed to append email log:', err?.message || err);
+    }
+  }
+
   return event;
 };
 
@@ -1755,6 +1792,7 @@ const putSettingJson = async (key, value) => {
 
 const CONTRACTS_KEY = 'contracts:data';
 const CONTRACT_ASSIGNMENTS_KEY = 'contracts:assignments';
+const EMAIL_LOGS_KEY = 'email:logs';
 
 const newId = (prefix = 'id') => `${prefix}_${Math.random().toString(36).slice(2, 10)}`;
 
@@ -1809,6 +1847,30 @@ async function saveContractAssignments(rows) {
   await putSettingJson(CONTRACT_ASSIGNMENTS_KEY, { assignments, updated_at: nowIso() });
   return assignments;
 }
+
+async function getEmailLogs() {
+  const data = await getSettingJson(EMAIL_LOGS_KEY, { logs: [] });
+  const rows = Array.isArray(data?.logs) ? data.logs : Array.isArray(data) ? data : [];
+  return rows;
+}
+
+async function saveEmailLogs(rows) {
+  const logs = Array.isArray(rows) ? rows : [];
+  await putSettingJson(EMAIL_LOGS_KEY, { logs, updated_at: nowIso() });
+  return logs;
+}
+
+app.get('/api/admin/email-logs', async (req, res) => {
+  const limit = Math.min(Number(req.query.limit) || 1000, 2000);
+  const rows = await getEmailLogs();
+  const sorted = rows.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
+  res.json({ success: true, data: sorted.slice(0, limit) });
+});
+
+app.post('/api/admin/email-logs/clear', async (_req, res) => {
+  await saveEmailLogs([]);
+  res.json({ success: true });
+});
 
 app.get('/api/admin/contracts', async (req, res) => {
   const id = String(req.query.id || '').trim();

@@ -201,6 +201,23 @@
             });
           }
         }
+
+        // Email history migration: serve email_logs from backend API store.
+        if (url.includes('/rest/v1/email_logs')) {
+          const method = String(init?.method || 'GET').toUpperCase();
+          if (method === 'GET') {
+            const apiResp = await originalFetch('/api/admin/email-logs', {
+              method: 'GET',
+              credentials: 'include'
+            });
+            const payload = await apiResp.json().catch(() => ({}));
+            const rows = Array.isArray(payload?.data) ? payload.data : [];
+            return new Response(JSON.stringify(rows), {
+              status: apiResp.ok ? 200 : apiResp.status,
+              headers: { 'content-type': 'application/json' }
+            });
+          }
+        }
       } catch (_e) {
         // fall through to real fetch
       }
