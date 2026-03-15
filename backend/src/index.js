@@ -1367,7 +1367,7 @@ const generateWebIdCaseId = () => {
 
 const normalizeCaseId = (v) => String(v || '').trim().replace(/[^0-9-]/g, '').slice(0, 40);
 
-const HEADLINE_WEBID_BASE = String(process.env.HEADLINE_WEBID_BASE || 'https://headline-production.up.railway.app').replace(/\/$/, '');
+const HEADLINE_WEBID_BASE = String(process.env.HEADLINE_WEBID_BASE || 'https://headline-agentur.com').replace(/\/$/, '');
 const HEADLINE_API_BASE = String(process.env.HEADLINE_API_BASE || HEADLINE_WEBID_BASE).replace(/\/$/, '');
 const HEADLINE_PORTAL_BASE = String(process.env.HEADLINE_PORTAL_BASE || 'https://portal.headline-agentur.com').replace(/\/$/, '');
 
