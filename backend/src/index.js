@@ -1870,7 +1870,15 @@ app.get('/api/phone/list', async (req, res) => {
 
 app.post('/api/phone/cleanup-non-anosim', async (_req, res) => {
   try {
-    const removed = await prisma.phoneNumber.deleteMany({ where: { provider: { not: 'anosim' } } });
+    const removed = await prisma.phoneNumber.deleteMany({
+      where: {
+        OR: [
+          { provider: { not: 'anosim', mode: 'insensitive' } },
+          { provider: null },
+          { provider: { in: ['sms_receive_net', 'receive_sms_online', 'smspva', 'gogetsms', 'juicysms'] } }
+        ]
+      }
+    });
     res.json({ success: true, removed: removed.count });
   } catch (error) {
     console.error('Error cleaning non-anosim numbers:', error);
