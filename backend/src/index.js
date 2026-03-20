@@ -3105,7 +3105,8 @@ const normalizeJobListing = (row = {}) => {
 
   const employmentTypeValue = row.type_of_employment || row.employment_type || row.employmentType || '';
   const workModelValue = row.working_model || row.workingModel || row.work_model || row.workModel || '';
-  const salaryDisplayValue = row.ad_text || row.adText || row.salary_display || row.salaryDisplay || row.salary_text || '';
+  const adTextValue = row.ad_text || row.adText || '';
+  const salaryDisplayValue = row.salary_display || row.salaryDisplay || adTextValue || row.salary_text || '';
   const weeklyHoursValue = row.weekly_hours || row.weeklyHours || '';
   const applicationDeadlineValue = row.application_deadline || row.applicationDeadline || '';
   const postedDateValue = row.posted_at || row.postedAt || row.date_posted || row.datePosted || row.created_at || '';
@@ -3156,8 +3157,8 @@ const normalizeJobListing = (row = {}) => {
     maxSalary: row.maxSalary ?? row.max_salary ?? 0,
     salary_type: row.salary_type || row.salaryType || 'per month',
     salaryType: row.salaryType || row.salary_type || 'per month',
-    ad_text: salaryDisplayValue,
-    adText: salaryDisplayValue,
+    ad_text: adTextValue,
+    adText: adTextValue,
     salary_display: row.salary_display || salaryDisplayValue,
     salaryDisplay: row.salaryDisplay || row.salary_display || salaryDisplayValue,
     requirements,
