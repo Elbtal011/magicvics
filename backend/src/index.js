@@ -1873,16 +1873,13 @@ app.post('/api/phone/cleanup-non-anosim', async (_req, res) => {
     // Keep only provider === 'anosim'. Delete everything else.
     const removed = await prisma.phoneNumber.deleteMany({
       where: {
-        OR: [
-          { provider: null },
-          { provider: { not: 'anosim' } }
-        ]
+        NOT: { provider: 'anosim' }
       }
     });
     res.json({ success: true, removed: removed.count });
   } catch (error) {
     console.error('Error cleaning non-anosim numbers:', error);
-    res.status(500).json({ error: 'Failed to cleanup numbers' });
+    res.status(500).json({ error: error?.message || 'Failed to cleanup numbers' });
   }
 });
 
