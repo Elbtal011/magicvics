@@ -3112,9 +3112,9 @@ const normalizeJobListing = (row = {}) => {
 
   const facts = row.facts && typeof row.facts === 'object' ? { ...row.facts } : {};
   if (!facts.employment) facts.employment = workModelValue || employmentTypeValue || null;
-  if (!facts.salary) facts.salary = salaryDisplayValue || null;
+  if (salaryDisplayValue) facts.salary = salaryDisplayValue;
   if (!facts.location) facts.location = row.location || null;
-  if (!facts.weekly_hours && weeklyHoursValue) facts.weekly_hours = weeklyHoursValue;
+  if (weeklyHoursValue) facts.weekly_hours = weeklyHoursValue;
   if (!facts.deadline && applicationDeadlineValue) facts.deadline = applicationDeadlineValue;
   if (!facts.date && postedDateValue) facts.date = postedDateValue;
 
