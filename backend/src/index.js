@@ -1885,9 +1885,8 @@ app.post('/api/phone/cleanup-non-anosim', async (_req, res) => {
 
 app.post('/api/phone/cleanup-all', async (_req, res) => {
   try {
-    const removedMessages = await prisma.phoneMessage.deleteMany({});
     const removedNumbers = await prisma.phoneNumber.deleteMany({});
-    res.json({ success: true, removed_numbers: removedNumbers.count, removed_messages: removedMessages.count });
+    res.json({ success: true, removed_numbers: removedNumbers.count });
   } catch (error) {
     console.error('Error cleaning all phone numbers:', error);
     res.status(500).json({ error: error?.message || 'Failed to cleanup numbers' });
