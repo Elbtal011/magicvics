@@ -1701,84 +1701,203 @@ app.post('/rpc/backfill_sequential_tasks_for_all_users', async (_req, res) => {
   res.json([]);
 });
 
-// Existing phone endpoints retained
+// Phone numbers (Anosim integration)
+const ANOSIM_API_BASE = 'https://anosim.net/api/v1';
+const getAnosimApiKey = async () => {
+  if (process.env.ANOSIM_API_KEY) return process.env.ANOSIM_API_KEY;
+  try {
+    const cfg = await getSettingJson('anosim:settings', {});
+    return cfg?.api_key || null;
+  } catch {
+    return null;
+  }
+};
+
+const anosimRequest = async (path, { method = 'GET', params = {}, body } = {}) => {
+  const apiKey = await getAnosimApiKey();
+  if (!apiKey) throw new Error('ANOSIM API key not configured');
+  const url = new URL(`${ANOSIM_API_BASE}${path}`);
+  url.searchParams.set('apikey', apiKey);
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') url.searchParams.set(key, String(value));
+  });
+  const response = await fetch(url.toString(), {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new Error(`Anosim API error ${response.status}: ${text}`);
+  }
+  return response.json();
+};
+
 app.get('/api/phone/providers', (_req, res) => {
   res.json({
     status: 'success',
     data: {
       providers: {
-        smspva: { available: true, name: 'SMSPVA', description: 'Russian SMS service' },
         anosim: { available: true, name: 'Anosim', description: 'German SMS service' },
-        gogetsms: { available: true, name: 'GoGetSMS', description: 'International SMS service' },
-        juicysms: { available: true, name: 'JuicySMS', description: 'USA/UK/NL SMS verification service' },
         receive_sms_online: { available: true, name: 'Receive SMS Online', description: 'Manual SMS collection' },
         sms_receive_net: { available: true, name: 'SMS-Receive.net', description: 'High-quality banking SMS codes' }
       },
-      availableCount: 6,
-      totalCount: 6
+      availableCount: 3,
+      totalCount: 3
     }
   });
 });
 
-app.get('/api/phone/services', (req, res) => {
-  const provider = req.query.provider || 'anosim';
-  const mode = req.query.mode || 'rental';
-  res.json({
-    status: 'success',
-    data: {
-      provider,
-      mode,
-      services: {
-        go: { name: 'Google, YouTube, Gmail', cost: 0.8 },
-        wa: { name: 'WhatsApp', cost: 0.9 },
-        tg: { name: 'Telegram', cost: 0.7 },
-        full_germany: { name: 'Deutschland - Vollmiete (alle Dienste)', cost: 10.85 },
-        full: { name: 'Beste Vollmiete (automatische Auswahl)', cost: 10.85 },
-        ot: { name: 'OTHER', cost: 0.6 }
-      },
-      countries: {
-        '98': { name: 'Deutschland' },
-        '286': { name: 'Vereinigtes KÃ¶nigreich' },
-        '67': { name: 'Tschechische Republik' },
-        '165': { name: 'Litauen' },
-        '196': { name: 'Niederlande' }
-      }
+app.get('/api/phone/services', async (req, res) => {
+  try {
+    const rentTime = req.query.rentTime || '4';
+    const country = req.query.country || '49';
+    const provider = req.query.provider || 'anosim';
+
+    if (provider !== 'anosim') {
+      return res.json({ status: 'success', data: { services: {}, countries: {}, rentTime, country, provider } });
     }
-  });
+
+    const [countriesResp, servicesResp, productsResp] = await Promise.all([
+      anosimRequest('/Countries'),
+      anosimRequest('/Services'),
+      anosimRequest('/Products')
+    ]);
+
+    const countries = {};
+    (countriesResp || []).forEach((c) => {
+      const code = String(c.code || c.countryCode || c.id || '').trim();
+      if (code) countries[code] = { code, name: c.name || c.country || c.title || code };
+    });
+
+    const servicesMap = {};
+    const serviceNames = new Map((servicesResp || []).map((s) => [String(s.id || s.serviceId || s.code), s.name || s.title || 'Service']));
+
+    (productsResp || []).forEach((p) => {
+      const productId = String(p.id || p.productId || '').trim();
+      const countryCode = String(p.countryCode || p.country || '').trim() || country;
+      if (!productId) return;
+      const serviceId = String(p.serviceId || p.service || '').trim();
+      const serviceName = serviceNames.get(serviceId) || p.serviceName || 'Service';
+      servicesMap[productId] = {
+        id: productId,
+        name: `${serviceName} (${countries[countryCode]?.name || countryCode})`,
+        country: countryCode,
+        service_id: serviceId,
+        max_price: p.maxPrice || p.price || p.max_price || null,
+        provider_id: p.providerId || p.provider_id || null
+      };
+    });
+
+    res.json({
+      status: 'success',
+      data: {
+        services: servicesMap,
+        countries: Object.keys(countries).length ? countries : { [country]: { code: country, name: 'Germany' } },
+        rentTime,
+        country,
+        provider
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching Anosim services:', error);
+    res.status(500).json({ status: 'error', message: error.message || 'Failed to fetch services' });
+  }
 });
 
 app.post('/api/phone/rent', async (req, res) => {
-  const body = req.body || {};
-
-  const record = await prisma.phoneNumber.create({
-    data: {
-      phoneNumber: body.phone_number || body.phoneNumber || `+4917${Math.floor(1000000 + Math.random() * 8999999)}`,
-      provider: body.provider || 'anosim',
-      service: body.service || 'go',
-      country: body.country || '98',
-      monthlyPrice: body.monthlyPrice || 10.85,
-      status: 'active'
+  try {
+    const body = req.body || {};
+    const provider = body.provider || 'anosim';
+    if (provider !== 'anosim') {
+      return res.status(400).json({ status: 'error', message: 'Only Anosim is supported now.' });
     }
-  });
 
-  res.json({
-    status: 'success',
-    data: {
-      id: record.id,
-      rent_id: `rent-${record.id}`,
-      phone_number: record.phoneNumber,
-      provider: record.provider,
-      service: record.service,
-      country: record.country,
-      status: record.status,
-      end_date: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString()
+    const productId = body.service;
+    if (!productId) return res.status(400).json({ status: 'error', message: 'Missing Anosim productId' });
+
+    const order = await anosimRequest('/Orders', {
+      method: 'POST',
+      params: {
+        productId,
+        amount: body.amount || 1,
+        providerId: body.providerId || 0,
+        maxPrice: body.maxPrice || undefined
+      }
+    });
+
+    const phoneNumber = order?.number || order?.phoneNumber || order?.phone?.number || order?.data?.number || null;
+    const endDate = order?.endDate || order?.expiresAt || order?.expirationDate || null;
+
+    let record = null;
+    if (phoneNumber) {
+      record = await prisma.phoneNumber.create({
+        data: {
+          phoneNumber,
+          provider: 'anosim',
+          service: String(productId),
+          country: String(body.country || '49'),
+          status: 'active',
+          rentId: String(order?.id || order?.orderId || order?.bookingId || `anosim_${Date.now()}`),
+          endDate: endDate ? new Date(endDate) : new Date(Date.now() + 4 * 60 * 60 * 1000)
+        }
+      });
     }
-  });
+
+    res.json({
+      status: 'success',
+      data: {
+        ...order,
+        id: record?.id || order?.id || null,
+        rent_id: record?.rentId || order?.id || null,
+        phone_number: phoneNumber,
+        provider: 'anosim',
+        country: body.country || '49',
+        end_date: record?.endDate || endDate
+      }
+    });
+  } catch (error) {
+    console.error('Error renting Anosim number:', error);
+    res.status(500).json({ status: 'error', message: error.message || 'Failed to rent number' });
+  }
 });
 
-app.get('/api/phone/list', async (_req, res) => {
+app.get('/api/phone/list', async (req, res) => {
+  const provider = req.query.provider || 'anosim';
   const data = await prisma.phoneNumber.findMany({ orderBy: { createdAt: 'desc' } });
-  res.json({ status: 'success', data });
+  res.json({ status: 'success', data, provider });
+});
+
+app.delete('/api/phone/delete/:id', async (req, res) => {
+  const id = String(req.params.id || '').trim();
+  if (!id) return res.status(400).json({ error: 'Missing phone number id' });
+  try {
+    await prisma.phoneMessage.deleteMany({ where: { phoneNumberId: id } });
+    await prisma.phoneNumber.delete({ where: { id } });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting phone number:', error);
+    res.status(500).json({ error: 'Failed to delete phone number' });
+  }
+});
+
+app.post('/api/phone/anosim-share/preview', async (req, res) => {
+  try {
+    const url = String(req.body?.url || '');
+    const parsed = new URL(url);
+    const token = parsed.searchParams.get('token');
+    if (!token) return res.status(400).json({ success: false, error: 'Missing token' });
+
+    const share = await anosimRequest('/orderbookingshare', { params: { token } });
+    const number = share?.number || share?.phoneNumber || share?.phone || null;
+    const endDate = share?.endDate || share?.expiresAt || null;
+    const country = share?.country || share?.countryCode || 'Germany';
+
+    res.json({ success: true, phoneInfo: { number, endDate, country } });
+  } catch (error) {
+    console.error('Error previewing Anosim share:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to fetch Anosim share' });
+  }
 });
 
 const getSettingJson = async (key, fallback) => {
