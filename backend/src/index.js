@@ -3106,11 +3106,17 @@ const normalizeJobListing = (row = {}) => {
   const employmentTypeValue = row.type_of_employment || row.employment_type || row.employmentType || '';
   const workModelValue = row.working_model || row.workingModel || row.work_model || row.workModel || '';
   const salaryDisplayValue = row.ad_text || row.adText || row.salary_display || row.salaryDisplay || row.salary_text || '';
+  const weeklyHoursValue = row.weekly_hours || row.weeklyHours || '';
+  const applicationDeadlineValue = row.application_deadline || row.applicationDeadline || '';
+  const postedDateValue = row.posted_at || row.postedAt || row.date_posted || row.datePosted || row.created_at || '';
 
   const facts = row.facts && typeof row.facts === 'object' ? { ...row.facts } : {};
-  if (!facts.employment) facts.employment = employmentTypeValue || null;
+  if (!facts.employment) facts.employment = workModelValue || employmentTypeValue || null;
   if (!facts.salary) facts.salary = salaryDisplayValue || null;
   if (!facts.location) facts.location = row.location || null;
+  if (!facts.weekly_hours && weeklyHoursValue) facts.weekly_hours = weeklyHoursValue;
+  if (!facts.deadline && applicationDeadlineValue) facts.deadline = applicationDeadlineValue;
+  if (!facts.date && postedDateValue) facts.date = postedDateValue;
 
   return {
     id: row.id || `job_${Math.random().toString(36).slice(2, 10)}`,
@@ -3138,6 +3144,12 @@ const normalizeJobListing = (row = {}) => {
     work_model: workModelValue,
     workModel: workModelValue,
     location: row.location || '',
+    weekly_hours: weeklyHoursValue || row.weekly_hours || row.weeklyHours || '',
+    weeklyHours: weeklyHoursValue || row.weeklyHours || row.weekly_hours || '',
+    application_deadline: applicationDeadlineValue || row.application_deadline || row.applicationDeadline || '',
+    applicationDeadline: applicationDeadlineValue || row.applicationDeadline || row.application_deadline || '',
+    posted_at: postedDateValue || row.posted_at || row.postedAt || row.created_at || '',
+    postedAt: postedDateValue || row.postedAt || row.posted_at || row.created_at || '',
     min_salary: row.min_salary ?? row.minSalary ?? 0,
     minSalary: row.minSalary ?? row.min_salary ?? 0,
     max_salary: row.max_salary ?? row.maxSalary ?? 0,
