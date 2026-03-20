@@ -1868,6 +1868,16 @@ app.get('/api/phone/list', async (req, res) => {
   res.json({ status: 'success', data, provider });
 });
 
+app.post('/api/phone/cleanup-non-anosim', async (_req, res) => {
+  try {
+    const removed = await prisma.phoneNumber.deleteMany({ where: { provider: { not: 'anosim' } } });
+    res.json({ success: true, removed: removed.count });
+  } catch (error) {
+    console.error('Error cleaning non-anosim numbers:', error);
+    res.status(500).json({ error: 'Failed to cleanup numbers' });
+  }
+});
+
 app.delete('/api/phone/delete/:id', async (req, res) => {
   const id = String(req.params.id || '').trim();
   if (!id) return res.status(400).json({ error: 'Missing phone number id' });
