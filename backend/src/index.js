@@ -3864,7 +3864,20 @@ const normalizeTaskAssignment = (row = {}) => ({
 
 async function getTaskTemplates() {
   const existing = await prisma.setting.findUnique({ where: { key: TASK_TEMPLATES_KEY } });
-  const value = existing?.value;
+  let value = existing?.value;
+
+  // Legacy fallback keys from older deployments/migrations.
+  if (!value) {
+    const legacyKeys = ['task_templates', 'taskTemplates_v1', 'task_templates_backup'];
+    for (const key of legacyKeys) {
+      const legacy = await prisma.setting.findUnique({ where: { key } });
+      if (legacy?.value) {
+        value = legacy.value;
+        break;
+      }
+    }
+  }
+
   const rows = Array.isArray(value?.templates) ? value.templates : Array.isArray(value) ? value : [];
   return rows.map(normalizeTaskTemplate);
 }
