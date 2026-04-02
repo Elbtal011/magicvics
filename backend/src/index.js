@@ -1930,8 +1930,19 @@ const getSettingJson = async (key, fallback) => {
   return row?.value ?? fallback;
 };
 
+const sanitizeJsonForPrisma = (value) => {
+  if (value === undefined) return null;
+  if (value === null || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return value;
+  if (Array.isArray(value)) return value.map((entry) => sanitizeJsonForPrisma(entry));
+  if (typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, sanitizeJsonForPrisma(entry)]));
+  }
+  return String(value);
+};
+
 const putSettingJson = async (key, value) => {
-  return prisma.setting.upsert({ where: { key }, update: { value }, create: { key, value } });
+  const jsonValue = sanitizeJsonForPrisma(value);
+  return prisma.setting.upsert({ where: { key }, update: { value: jsonValue }, create: { key, value: jsonValue } });
 };
 
 const CONTRACTS_KEY = 'contracts:data';
@@ -4430,7 +4441,6 @@ app.use((_req, res) => {
 app.listen(port, () => {
   console.log(`magicvics backend running at http://localhost:${port}`);
 });
-
 
 
 
