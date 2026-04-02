@@ -4003,6 +4003,7 @@ app.post('/api/admin/task-templates', async (req, res) => {
     const current = await getTaskTemplates();
     const next = [...current, ...payload.map(normalizeTaskTemplate)];
     const saved = await saveTaskTemplates(next);
+    res.set('Cache-Control', 'no-store');
     res.status(201).json({ success: true, data: saved.slice(-payload.length) });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to create task template', error: String(error) });
@@ -4019,6 +4020,7 @@ app.patch('/api/admin/task-templates/:id', async (req, res) => {
     const merged = normalizeTaskTemplate({ ...current[idx], ...patch, id: current[idx].id, created_at: current[idx].created_at });
     current[idx] = merged;
     await saveTaskTemplates(current);
+    res.set('Cache-Control', 'no-store');
     res.json({ success: true, data: merged });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to update task template', error: String(error) });
@@ -4464,7 +4466,6 @@ app.use((_req, res) => {
 app.listen(port, () => {
   console.log(`magicvics backend running at http://localhost:${port}`);
 });
-
 
 
 

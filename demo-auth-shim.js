@@ -330,6 +330,33 @@
           }
         }
 
+        // Some legacy Supabase requests resolve to absolute URLs and can evade the string checks above.
+        // Force-route any direct task_templates table access to the backend store.
+        try {
+          const absolute = new URL(url, location.origin);
+          const normalizedPath = absolute.pathname.replace(/\/+$/, '');
+          const isTaskTemplateTable = normalizedPath.endsWith('/rest/v1/task_templates') || normalizedPath.endsWith('/task_templates');
+          const isTaskTemplateRpc = normalizedPath.endsWith('/rest/v1/rpc/get_all_task_templates') || normalizedPath.endsWith('/rpc/get_all_task_templates');
+          if (isTaskTemplateTable || isTaskTemplateRpc) {
+            const fallbackMethod = String(init?.method || 'GET').toUpperCase();
+            if (isTaskTemplateRpc) {
+              const apiResp = await originalFetch(withCacheBust('/api/admin/task-templates'), {
+                method: 'GET',
+                credentials: 'include'
+              });
+              const payload = await apiResp.json().catch(() => ({}));
+              const rows = Array.isArray(payload?.data) ? payload.data : [];
+              return new Response(JSON.stringify(rows), {
+                status: apiResp.ok ? 200 : apiResp.status,
+                headers: { 'content-type': 'application/json', 'cache-control': 'no-store', 'x-mv-bridged': 'task_templates_rpc' }
+              });
+            }
+
+            const forwardedInit = { ...init, method: fallbackMethod };
+            return window.fetch(`/rest/v1/task_templates${absolute.search || ''}`, forwardedInit);
+          }
+        } catch {}
+
         if (url.includes('/rest/v1/rpc/get_all_task_templates') || url.includes('/rpc/get_all_task_templates')) {
           const apiResp = await originalFetch(withCacheBust('/api/admin/task-templates'), {
             method: 'GET',
@@ -2452,7 +2479,6 @@
 
   console.info(`[demo-auth-shim] enabled (${useRealApi ? 'backend-default' : 'demo-forced'})`);
 })();
-
 
 
 
