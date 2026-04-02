@@ -26,7 +26,20 @@
 
     window.fetch = async (input, init = {}) => {
       try {
-        const raw = typeof input === 'string' ? input : input?.url || '';
+        // Normalize fetch input across all supported shapes:
+        // - string
+        // - URL
+        // - Request (has .url)
+        // Some libraries (including supabase-js in certain code paths) may pass a URL
+        // object to fetch(). The previous implementation only read `input.url`, which
+        // is undefined for URL objects, causing our production migration bridges to be
+        // skipped and requests to fall through to Supabase RLS (403).
+        const raw =
+          typeof input === 'string'
+            ? input
+            : input && typeof input === 'object'
+              ? (input.url || input.href || String(input))
+              : '';
         const url = String(raw || '');
 
         if (
