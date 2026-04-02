@@ -34,6 +34,18 @@
         return '';
       }
     };
+
+    const withCacheBust = (url) => {
+      try {
+        if (!url) return url;
+        const u = new URL(url, location.origin);
+        // Avoid any proxy/CDN caching issues when switching from Supabase to backend.
+        u.searchParams.set('_mvts', String(Date.now()));
+        return u.toString();
+      } catch {
+        return url;
+      }
+    };
     const mapUsersToLegacyProfiles = (users) =>
       (Array.isArray(users) ? users : []).map((u) => ({
         id: u.id,
@@ -204,7 +216,7 @@
           const targetId = eq('id');
 
           if (method === 'GET' || method === 'HEAD') {
-            const apiResp = await originalFetch(base, {
+            const apiResp = await originalFetch(withCacheBust(base), {
               method: 'GET',
               credentials: 'include'
             });
@@ -228,7 +240,7 @@
 
             return new Response(JSON.stringify(single ? (rows[0] || null) : rows), {
               status: apiResp.ok ? 200 : apiResp.status,
-              headers: { 'content-type': 'application/json' }
+              headers: { 'content-type': 'application/json', 'cache-control': 'no-store', 'x-mv-bridged': 'task_templates' }
             });
           }
 
@@ -254,9 +266,15 @@
               }
             })();
             const wantsObject = acceptHeader.includes('application/vnd.pgrst.object+json');
+
+            // No Supabase realtime here; force any mounted screens to refetch.
+            if (apiResp.ok) {
+              try { window.dispatchEvent(new CustomEvent('supabase-reconnect')); } catch {}
+            }
+
             return new Response(JSON.stringify(wantsObject ? (rows[0] || null) : rows), {
               status: apiResp.ok ? 201 : apiResp.status,
-              headers: { 'content-type': 'application/json' }
+              headers: { 'content-type': 'application/json', 'cache-control': 'no-store', 'x-mv-bridged': 'task_templates' }
             });
           }
 
@@ -283,9 +301,14 @@
               }
             })();
             const wantsObject = acceptHeader.includes('application/vnd.pgrst.object+json');
+
+            if (apiResp.ok) {
+              try { window.dispatchEvent(new CustomEvent('supabase-reconnect')); } catch {}
+            }
+
             return new Response(JSON.stringify(wantsObject ? row : (row ? [row] : [])), {
               status: apiResp.ok ? 200 : apiResp.status,
-              headers: { 'content-type': 'application/json' }
+              headers: { 'content-type': 'application/json', 'cache-control': 'no-store', 'x-mv-bridged': 'task_templates' }
             });
           }
 
@@ -295,15 +318,20 @@
               method: 'DELETE',
               credentials: 'include'
             });
+
+            if (apiResp.ok) {
+              try { window.dispatchEvent(new CustomEvent('supabase-reconnect')); } catch {}
+            }
+
             return new Response(JSON.stringify([]), {
               status: apiResp.ok ? 200 : apiResp.status,
-              headers: { 'content-type': 'application/json' }
+              headers: { 'content-type': 'application/json', 'cache-control': 'no-store', 'x-mv-bridged': 'task_templates' }
             });
           }
         }
 
         if (url.includes('/rest/v1/rpc/get_all_task_templates') || url.includes('/rpc/get_all_task_templates')) {
-          const apiResp = await originalFetch('/api/admin/task-templates', {
+          const apiResp = await originalFetch(withCacheBust('/api/admin/task-templates'), {
             method: 'GET',
             credentials: 'include'
           });
@@ -311,7 +339,7 @@
           const rows = Array.isArray(payload?.data) ? payload.data : [];
           return new Response(JSON.stringify(rows), {
             status: apiResp.ok ? 200 : apiResp.status,
-            headers: { 'content-type': 'application/json' }
+            headers: { 'content-type': 'application/json', 'cache-control': 'no-store', 'x-mv-bridged': 'task_templates_rpc' }
           });
         }
 

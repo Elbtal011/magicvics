@@ -3987,6 +3987,9 @@ async function savePayoutRequests(requests) {
 
 app.get('/api/admin/task-templates', async (_req, res) => {
   try {
+    // This endpoint is used as a Supabase-compat bridge from the static frontend.
+    // Never allow caching (otherwise the UI can appear empty right after creates).
+    res.set('Cache-Control', 'no-store');
     const rows = await getTaskTemplates();
     res.json({ success: true, count: rows.length, data: rows });
   } catch (error) {
