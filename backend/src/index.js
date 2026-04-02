@@ -3840,6 +3840,23 @@ const normalizeTaskTemplate = (row = {}) => {
       return { title, description };
     })
     .filter(Boolean);
+  const rawAttachments = Array.isArray(row.required_attachments) ? row.required_attachments : [];
+  const normalizedAttachments = rawAttachments
+    .map((attachment) => {
+      if (typeof attachment === 'string') {
+        const name = String(attachment || '').trim();
+        if (!name) return null;
+        return { name, description: '', required: true };
+      }
+      const name = String(attachment?.name || attachment?.label || '').trim();
+      if (!name) return null;
+      return {
+        name,
+        description: String(attachment?.description || '').trim(),
+        required: attachment?.required !== false
+      };
+    })
+    .filter(Boolean);
 
   return {
     id: row.id || `tt_${Math.random().toString(36).slice(2, 10)}`,
@@ -3849,10 +3866,13 @@ const normalizeTaskTemplate = (row = {}) => {
     priority: String(row.priority || 'medium').toLowerCase(),
     estimated_hours: Number(row.estimated_hours ?? row.estimatedHours ?? 1) || 1,
     is_starter_job: Boolean(row.is_starter_job),
-    order_number: row.is_starter_job ? null : (row.order_number ?? null),
-    required_attachments: Array.isArray(row.required_attachments) ? row.required_attachments : [],
+    order_number: row.is_starter_job ? null : (row.order_number === '' || row.order_number == null ? null : Number(row.order_number)),
+    required_attachments: normalizedAttachments,
     steps: normalizedSteps,
-    payment_amount: row.payment_amount ?? null,
+    payment_amount: row.payment_amount === '' || row.payment_amount == null ? null : Number(row.payment_amount),
+    play_store_url: String(row.play_store_url || '').trim() || null,
+    app_store_url: String(row.app_store_url || '').trim() || null,
+    ident_method: String(row.ident_method || '').trim() || null,
     created_by: row.created_by || null,
     created_at: row.created_at || nowIso(),
     updated_at: nowIso()
@@ -4441,7 +4461,6 @@ app.use((_req, res) => {
 app.listen(port, () => {
   console.log(`magicvics backend running at http://localhost:${port}`);
 });
-
 
 
 
