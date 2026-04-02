@@ -1276,10 +1276,23 @@
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify(entries)
         });
-        if (!resp.ok) return json({ message: 'Failed to create task template' }, 502);
+        if (!resp.ok) {
+          const payload = await resp.json().catch(() => ({}));
+          return json(
+            {
+              message: payload?.message || 'Failed to create task template',
+              error: payload?.error || null,
+              details: payload?.details || null,
+              status: resp.status
+            },
+            resp.status
+          );
+        }
         const payload = await resp.json().catch(() => ({}));
         const created = Array.isArray(payload?.data) ? payload.data : [];
-        return getPrefer(init?.headers).includes('return=representation') ? json(created) : noContent(201);
+        const wantsObject = (asHeaders(init?.headers).get('accept') || '').toLowerCase().includes('vnd.pgrst.object+json');
+        if (wantsObject) return created[0] ? json(created[0], 201) : json({ message: 'No rows' }, 406);
+        return getPrefer(init?.headers).includes('return=representation') ? json(created, 201) : noContent(201);
       }
 
       if (method === 'PATCH' || method === 'PUT') {
@@ -1292,9 +1305,22 @@
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify(body)
         });
-        if (!resp.ok) return json({ message: 'Failed to update task template' }, 502);
+        if (!resp.ok) {
+          const payload = await resp.json().catch(() => ({}));
+          return json(
+            {
+              message: payload?.message || 'Failed to update task template',
+              error: payload?.error || null,
+              details: payload?.details || null,
+              status: resp.status
+            },
+            resp.status
+          );
+        }
         const payload = await resp.json().catch(() => ({}));
         const updated = payload?.data ? [payload.data] : [];
+        const wantsObject = (asHeaders(init?.headers).get('accept') || '').toLowerCase().includes('vnd.pgrst.object+json');
+        if (wantsObject) return updated[0] ? json(updated[0]) : json({ message: 'No rows' }, 406);
         return getPrefer(init?.headers).includes('return=representation') ? json(updated) : noContent();
       }
 
@@ -2250,7 +2276,6 @@
 
   console.info(`[demo-auth-shim] enabled (${useRealApi ? 'backend-default' : 'demo-forced'})`);
 })();
-
 
 
 
