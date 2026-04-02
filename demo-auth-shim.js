@@ -168,7 +168,7 @@
         }
 
         // Task templates migration bridge: route legacy Supabase REST calls to backend API in production.
-        if (url.includes('/rest/v1/task_templates')) {
+        if (url.includes('/rest/v1/task_templates') || url.includes('/task_templates?')) {
           const method = String(init?.method || 'GET').toUpperCase();
           const u = new URL(url, location.origin);
           const base = '/api/admin/task-templates';
@@ -278,7 +278,7 @@
           }
         }
 
-        if (url.includes('/rest/v1/rpc/get_all_task_templates')) {
+        if (url.includes('/rest/v1/rpc/get_all_task_templates') || url.includes('/rpc/get_all_task_templates')) {
           const apiResp = await originalFetch('/api/admin/task-templates', {
             method: 'GET',
             credentials: 'include'
@@ -2400,7 +2400,6 @@
 
   console.info(`[demo-auth-shim] enabled (${useRealApi ? 'backend-default' : 'demo-forced'})`);
 })();
-
 
 
 
