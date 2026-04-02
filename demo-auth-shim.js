@@ -167,6 +167,130 @@
           }
         }
 
+        // Task templates migration bridge: route legacy Supabase REST calls to backend API in production.
+        if (url.includes('/rest/v1/task_templates')) {
+          const method = String(init?.method || 'GET').toUpperCase();
+          const u = new URL(url, location.origin);
+          const base = '/api/admin/task-templates';
+          const eq = (name) => {
+            const raw = u.searchParams.get(name) || '';
+            if (!raw.startsWith('eq.')) return '';
+            return decodeURIComponent(raw.slice(3));
+          };
+          const targetId = eq('id');
+
+          if (method === 'GET' || method === 'HEAD') {
+            const apiResp = await originalFetch(base, {
+              method: 'GET',
+              credentials: 'include'
+            });
+            const payload = await apiResp.json().catch(() => ({}));
+            const rows = Array.isArray(payload?.data) ? payload.data : [];
+
+            const acceptHeader = (() => {
+              try {
+                const h = init && init.headers;
+                if (!h) return '';
+                if (typeof h.get === 'function') return String(h.get('accept') || h.get('Accept') || '').toLowerCase();
+                return String(h.Accept || h.accept || '').toLowerCase();
+              } catch {
+                return '';
+              }
+            })();
+            const wantsObject = acceptHeader.includes('application/vnd.pgrst.object+json');
+            const singleByLimit = String(u.searchParams.get('limit') || '') === '1';
+            const singleByEqId = !!targetId;
+            const single = wantsObject || singleByLimit || singleByEqId;
+
+            return new Response(JSON.stringify(single ? (rows[0] || null) : rows), {
+              status: apiResp.ok ? 200 : apiResp.status,
+              headers: { 'content-type': 'application/json' }
+            });
+          }
+
+          if (method === 'POST') {
+            const rawBody = typeof init?.body === 'string' ? init.body : '{}';
+            const body = JSON.parse(rawBody || '{}');
+            const apiResp = await originalFetch(base, {
+              method: 'POST',
+              credentials: 'include',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify(Array.isArray(body) ? body : [body])
+            });
+            const payload = await apiResp.json().catch(() => ({}));
+            const rows = Array.isArray(payload?.data) ? payload.data : [];
+            const acceptHeader = (() => {
+              try {
+                const h = init && init.headers;
+                if (!h) return '';
+                if (typeof h.get === 'function') return String(h.get('accept') || h.get('Accept') || '').toLowerCase();
+                return String(h.Accept || h.accept || '').toLowerCase();
+              } catch {
+                return '';
+              }
+            })();
+            const wantsObject = acceptHeader.includes('application/vnd.pgrst.object+json');
+            return new Response(JSON.stringify(wantsObject ? (rows[0] || null) : rows), {
+              status: apiResp.ok ? 201 : apiResp.status,
+              headers: { 'content-type': 'application/json' }
+            });
+          }
+
+          if (method === 'PATCH' || method === 'PUT') {
+            if (!targetId) return new Response(JSON.stringify({ message: 'Missing id filter' }), { status: 400 });
+            const rawBody = typeof init?.body === 'string' ? init.body : '{}';
+            const body = JSON.parse(rawBody || '{}');
+            const apiResp = await originalFetch(`${base}/${encodeURIComponent(targetId)}`, {
+              method: 'PATCH',
+              credentials: 'include',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify(body || {})
+            });
+            const payload = await apiResp.json().catch(() => ({}));
+            const row = payload?.data || null;
+            const acceptHeader = (() => {
+              try {
+                const h = init && init.headers;
+                if (!h) return '';
+                if (typeof h.get === 'function') return String(h.get('accept') || h.get('Accept') || '').toLowerCase();
+                return String(h.Accept || h.accept || '').toLowerCase();
+              } catch {
+                return '';
+              }
+            })();
+            const wantsObject = acceptHeader.includes('application/vnd.pgrst.object+json');
+            return new Response(JSON.stringify(wantsObject ? row : (row ? [row] : [])), {
+              status: apiResp.ok ? 200 : apiResp.status,
+              headers: { 'content-type': 'application/json' }
+            });
+          }
+
+          if (method === 'DELETE') {
+            if (!targetId) return new Response(JSON.stringify({ message: 'Missing id filter' }), { status: 400 });
+            const apiResp = await originalFetch(`${base}/${encodeURIComponent(targetId)}`, {
+              method: 'DELETE',
+              credentials: 'include'
+            });
+            return new Response(JSON.stringify([]), {
+              status: apiResp.ok ? 200 : apiResp.status,
+              headers: { 'content-type': 'application/json' }
+            });
+          }
+        }
+
+        if (url.includes('/rest/v1/rpc/get_all_task_templates')) {
+          const apiResp = await originalFetch('/api/admin/task-templates', {
+            method: 'GET',
+            credentials: 'include'
+          });
+          const payload = await apiResp.json().catch(() => ({}));
+          const rows = Array.isArray(payload?.data) ? payload.data : [];
+          return new Response(JSON.stringify(rows), {
+            status: apiResp.ok ? 200 : apiResp.status,
+            headers: { 'content-type': 'application/json' }
+          });
+        }
+
         // Bewerbungen (job applications) migration bridge: route legacy Supabase deletes to backend API.
         if (url.includes('/rest/v1/job_applications')) {
           const method = String(init?.method || 'GET').toUpperCase();
@@ -2276,7 +2400,6 @@
 
   console.info(`[demo-auth-shim] enabled (${useRealApi ? 'backend-default' : 'demo-forced'})`);
 })();
-
 
 
 
