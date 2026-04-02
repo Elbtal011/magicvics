@@ -15,6 +15,25 @@
     } catch {}
 
     const originalFetch = window.fetch.bind(window);
+
+    // Debugging helper (disabled by default):
+    //   localStorage.setItem('MV_DEBUG_BRIDGES','1')
+    //   location.reload()
+    const DEBUG_BRIDGES = localStorage.getItem('MV_DEBUG_BRIDGES') === '1';
+
+    const normalizeFetchUrl = (input) => {
+      try {
+        if (typeof input === 'string') return input;
+        // Request
+        if (typeof Request !== 'undefined' && input instanceof Request) return input.url;
+        // URL
+        if (typeof URL !== 'undefined' && input instanceof URL) return input.href;
+        if (input && typeof input === 'object') return input.url || input.href || String(input);
+        return '';
+      } catch {
+        return '';
+      }
+    };
     const mapUsersToLegacyProfiles = (users) =>
       (Array.isArray(users) ? users : []).map((u) => ({
         id: u.id,
@@ -26,21 +45,12 @@
 
     window.fetch = async (input, init = {}) => {
       try {
-        // Normalize fetch input across all supported shapes:
-        // - string
-        // - URL
-        // - Request (has .url)
-        // Some libraries (including supabase-js in certain code paths) may pass a URL
-        // object to fetch(). The previous implementation only read `input.url`, which
-        // is undefined for URL objects, causing our production migration bridges to be
-        // skipped and requests to fall through to Supabase RLS (403).
-        const raw =
-          typeof input === 'string'
-            ? input
-            : input && typeof input === 'object'
-              ? (input.url || input.href || String(input))
-              : '';
-        const url = String(raw || '');
+        // Normalize fetch input across all supported shapes (string / Request / URL)
+        // so our production migration bridges reliably trigger.
+        const url = String(normalizeFetchUrl(input) || '');
+        if (DEBUG_BRIDGES && (url.includes('/rest/v1/task_templates') || url.includes('/rest/v1/contracts'))) {
+          console.log('[mv-bridge] fetch:', { url, method: String(init?.method || 'GET').toUpperCase() });
+        }
 
         if (
           url.includes('/rest/v1/rpc/get_profiles_with_emails_complete') ||
@@ -182,6 +192,7 @@
 
         // Task templates migration bridge: route legacy Supabase REST calls to backend API in production.
         if (url.includes('/rest/v1/task_templates') || url.includes('/task_templates?')) {
+          if (DEBUG_BRIDGES) console.log('[mv-bridge] task_templates -> /api/admin/task-templates');
           const method = String(init?.method || 'GET').toUpperCase();
           const u = new URL(url, location.origin);
           const base = '/api/admin/task-templates';
@@ -1877,7 +1888,7 @@
   const originalFetch = window.fetch.bind(window);
   window.fetch = async (input, init = {}) => {
     const request = input instanceof Request ? input : null;
-    const url = typeof input === 'string' ? input : input.url;
+    const url = typeof input === 'string' ? input : (input?.url || input?.href || String(input));
     const method = (init.method || request?.method || 'GET').toUpperCase();
     const mergedInit = {
       ...init,
