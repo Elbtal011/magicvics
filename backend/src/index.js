@@ -4071,6 +4071,48 @@ app.post('/api/admin/task-assignments/from-template', async (req, res) => {
     });
 
     await saveTaskAssignments([created, ...assignments]);
+
+    // Also persist to DB task_assignments so user dashboards show tasks.
+    try {
+      let employee = await prisma.employee.findUnique({ where: { id: assigneeId }, select: { id: true, profileId: true } });
+      if (!employee) {
+        employee = await prisma.employee.findUnique({ where: { profileId: assigneeId }, select: { id: true, profileId: true } });
+      }
+      if (!employee) {
+        const profile = await prisma.profile.findUnique({ where: { id: assigneeId }, select: { id: true } });
+        if (profile?.id) {
+          employee = await prisma.employee.create({
+            data: { profileId: profile.id, status: 'active' },
+            select: { id: true, profileId: true }
+          });
+        }
+      }
+
+      const employeeId = employee?.id || null;
+      if (employeeId) {
+        const existingDb = await prisma.taskAssignment.findFirst({
+          where: {
+            assigneeId: employeeId,
+            title: String(template.title || '').trim(),
+            status: { in: ['pending', 'open', 'accepted', 'assigned', 'in_progress'] }
+          }
+        });
+        if (!existingDb) {
+          const dueDate = body.due_date || body.p_due_date || null;
+          const parsedDueDate = dueDate ? new Date(dueDate) : null;
+          await prisma.taskAssignment.create({
+            data: {
+              assigneeId: employeeId,
+              title: String(template.title || 'Task').trim(),
+              status: 'pending',
+              dueDate: parsedDueDate && !Number.isNaN(parsedDueDate.getTime()) ? parsedDueDate : null
+            }
+          });
+        }
+      }
+    } catch (err) {
+      console.error('[task-assignments] db write failed:', err?.message || err);
+    }
     res.status(201).json({
       success: true,
       data: {
@@ -4466,6 +4508,5 @@ app.use((_req, res) => {
 app.listen(port, () => {
   console.log(`magicvics backend running at http://localhost:${port}`);
 });
-
 
 
