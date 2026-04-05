@@ -12,6 +12,17 @@
     <link rel="preload" href="/fonts/Richykid.woff2" as="font" type="font/woff2" crossorigin>
     <link rel="preload" href="/fonts/Tremors-Regular.woff2" as="font" type="font/woff2" crossorigin>
   
+    <script>
+      window.addEventListener('DOMContentLoaded', () => {
+        const keepIds = new Set(['root', 'chat-launcher', 'chat-panel']);
+        const keepTags = new Set(['SCRIPT', 'STYLE', 'LINK', 'NOSCRIPT']);
+        Array.from(document.body.children).forEach((node) => {
+          if (keepIds.has(node.id) || keepTags.has(node.tagName)) return;
+          if (node.hasAttribute('data-allow-injection')) return;
+          node.remove();
+        });
+      });
+    </script>
     <script src="/demo-auth-shim.js?v=20260402c"></script>
     <script defer src="/portal-chat-widget.js"></script>
     <script type="module" crossorigin src="/assets/index-CKZAQd6b.js"></script>
