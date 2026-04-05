@@ -27,10 +27,26 @@ const mime = {
   '.map': 'application/json; charset=utf-8'
 };
 
+const cspHeader = [
+  "default-src 'self'",
+  "script-src 'self' https://static.cloudflareinsights.com",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "img-src 'self' data: https:",
+  "font-src 'self' data: https://fonts.gstatic.com",
+  "connect-src 'self' https://backend-production-4c3c.up.railway.app https://*.supabase.co wss://*.supabase.co",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "frame-ancestors 'self'"
+].join('; ');
+
 function sendFile(res, filePath) {
   const ext = path.extname(filePath).toLowerCase();
   const type = mime[ext] || 'application/octet-stream';
-  res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'no-cache' });
+  res.writeHead(200, {
+    'Content-Type': type,
+    'Cache-Control': 'no-cache',
+    'Content-Security-Policy': cspHeader
+  });
   fs.createReadStream(filePath).pipe(res);
 }
 
@@ -78,11 +94,18 @@ http.createServer((req, res) => {
   // SPA fallback for frontend routes
   const fallback = path.join(root, 'index.html');
   if (fs.existsSync(fallback)) {
-    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
+    res.writeHead(200, {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Cache-Control': 'no-cache',
+      'Content-Security-Policy': cspHeader
+    });
     return fs.createReadStream(fallback).pipe(res);
   }
 
-  res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+  res.writeHead(404, {
+    'Content-Type': 'text/plain; charset=utf-8',
+    'Content-Security-Policy': cspHeader
+  });
   res.end('Not found');
 }).listen(port, '0.0.0.0', () => {
   console.log(`magicvics mirror server running on 0.0.0.0:${port}`);
