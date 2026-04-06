@@ -3,6 +3,40 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
 import nodemailer from 'nodemailer';
+import multer from 'multer';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { mkdirSync } from 'fs';
+
+// Resolve __dirname in ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Ensure uploads/webid directory exists
+const uploadsWebidDir = path.join(__dirname, '..', 'uploads', 'webid');
+try {
+  mkdirSync(uploadsWebidDir, { recursive: true });
+} catch { /* already exists */ }
+
+// Multer configuration for KYC document uploads
+const kycStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadsWebidDir),
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    const ext = path.extname(file.originalname);
+    const baseName = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9_\-]/g, '_');
+    cb(null, `${baseName}-${uniqueSuffix}${ext}`);
+  }
+});
+const kycUpload = multer({
+  storage: kycStorage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  fileFilter: (req, file, cb) => {
+    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+    if (allowed.includes(file.mimetype)) cb(null, true);
+    else cb(new Error('Only JPG, PNG, WebP, and PDF files are allowed'));
+  }
+});
 
 dotenv.config();
 
@@ -37,6 +71,9 @@ app.use(
   })
 );
 app.use(express.json());
+
+// Serve uploaded files statically at /uploads
+app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
 const nowIso = () => new Date().toISOString();
 const num = (v, fallback = 0) => {
@@ -1462,6 +1499,33 @@ app.get('/api/admin/kyc-document', async (req, res) => {
     return res.status(200).send(Buffer.from(ab));
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Failed to proxy KYC document', error: String(error) });
+  }
+});
+
+// POST /api/admin/kyc-upload — handles KYC document uploads replacing Supabase Storage
+// Expected fields: file (multipart), workerId (string)
+app.post('/api/admin/kyc-upload', kycUpload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
+    const { workerId } = req.body;
+    if (!workerId) return res.status(400).json({ success: false, message: 'workerId is required' });
+
+    // Build the relative path that matches the existing webid convention
+    const relativePath = `uploads/webid/${req.file.filename}`;
+
+    return res.status(200).json({
+      success: true,
+      path: relativePath,
+      filename: req.file.filename,
+      originalName: req.file.originalname,
+      mimetype: req.file.mimetype,
+      size: req.file.size
+    });
+  } catch (error) {
+    if (error.message && error.message.includes('Only JPG, PNG, WebP, and PDF')) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+    return res.status(500).json({ success: false, message: 'Upload failed', error: String(error) });
   }
 });
 
