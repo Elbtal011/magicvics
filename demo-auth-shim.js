@@ -379,7 +379,6 @@
               if (!profile || typeof profile !== 'object') return profile;
               return {
                 ...profile,
-                role: 'admin',
                 kyc_status: profile.kyc_status || 'approved'
               };
             };
