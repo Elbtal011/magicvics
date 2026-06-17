@@ -1129,8 +1129,8 @@ app.post('/api/balance/add-bonus', async (req, res) => {
   });
 });
 
-const HEADLINE_EMAIL_FOOTER_TEXT = `---\nAngaben gemäß § 5 TMG\nHeadline GP GmbH\nHopfenmarkt 33\n20457 Hamburg\nDeutschland\nKontakt\nE-Mail: info@headline-agentur.com\nTelefon: +49 1520 8498 39\nDiese E-Mail wurde automatisch erstellt. Bitte antworten Sie nicht direkt auf diese Nachricht.`;
-const HEADLINE_EMAIL_FOOTER_HTML = `<hr style="border:none;border-top:1px solid #e5e7eb;margin:18px 0"/><p style="font-size:12px;color:#6b7280;line-height:1.5">Angaben gemäß § 5 TMG<br/>Headline GP GmbH<br/>Hopfenmarkt 33<br/>20457 Hamburg<br/>Deutschland<br/>Kontakt<br/>E-Mail: <a href="mailto:info@headline-agentur.com">info@headline-agentur.com</a><br/>Telefon: +49 1520 8498 39<br/>Diese E-Mail wurde automatisch erstellt. Bitte antworten Sie nicht direkt auf diese Nachricht.</p>`;
+const HEADLINE_EMAIL_FOOTER_TEXT = `---\nAngaben gemäß § 5 TMG\nHeadline GP GmbH\nHopfenmarkt 33\n20457 Hamburg\nDeutschland\nKontakt\nE-Mail: info@headlineagentur.com\nTelefon: +49 1520 8498 39\nDiese E-Mail wurde automatisch erstellt. Bitte antworten Sie nicht direkt auf diese Nachricht.`;
+const HEADLINE_EMAIL_FOOTER_HTML = `<hr style="border:none;border-top:1px solid #e5e7eb;margin:18px 0"/><p style="font-size:12px;color:#6b7280;line-height:1.5">Angaben gemäß § 5 TMG<br/>Headline GP GmbH<br/>Hopfenmarkt 33<br/>20457 Hamburg<br/>Deutschland<br/>Kontakt<br/>E-Mail: <a href="mailto:info@headlineagentur.com">info@headlineagentur.com</a><br/>Telefon: +49 1520 8498 39<br/>Diese E-Mail wurde automatisch erstellt. Bitte antworten Sie nicht direkt auf diese Nachricht.</p>`;
 
 function buildHeadlineEmailTemplate(template, payload = {}, fromName = 'Headline Agentur') {
   const firstName = String(payload?.first_name || payload?.firstName || '').trim();
