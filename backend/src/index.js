@@ -45,9 +45,9 @@ const prisma = new PrismaClient();
 const port = Number(process.env.PORT || 4000);
 
 const defaultAllowedOrigins = [
-  'https://portal.headline-agentur.com',
-  'https://headline-agentur.com',
-  'https://www.headline-agentur.com'
+  'https://portal.headlineagentur.com',
+  'https://headlineagentur.com',
+  'https://www.headlineagentur.com'
 ];
 
 const envAllowedOrigins = String(process.env.FRONTEND_ORIGIN || process.env.CORS_ORIGINS || '')
@@ -1404,9 +1404,9 @@ const generateWebIdCaseId = () => {
 
 const normalizeCaseId = (v) => String(v || '').trim().replace(/[^0-9-]/g, '').slice(0, 40);
 
-const HEADLINE_WEBID_BASE = String(process.env.HEADLINE_WEBID_BASE || 'https://headline-agentur.com').replace(/\/$/, '');
+const HEADLINE_WEBID_BASE = String(process.env.HEADLINE_WEBID_BASE || 'https://headlineagentur.com').replace(/\/$/, '');
 const HEADLINE_API_BASE = String(process.env.HEADLINE_API_BASE || HEADLINE_WEBID_BASE).replace(/\/$/, '');
-const HEADLINE_PORTAL_BASE = String(process.env.HEADLINE_PORTAL_BASE || 'https://portal.headline-agentur.com').replace(/\/$/, '');
+const HEADLINE_PORTAL_BASE = String(process.env.HEADLINE_PORTAL_BASE || 'https://portal.headlineagentur.com').replace(/\/$/, '');
 
 const getKycInvites = async () => {
   const row = await loadJsonSetting('kyc:webid:invites', { invites: [] });
