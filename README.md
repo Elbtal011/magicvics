@@ -5,8 +5,8 @@ Local mirror of delivered frontend assets from:
 - `https://magicvics.lockigesbrusthaar.cloud`
 
 ## Production Domains
-- Magic Portal backend, admin, and logged-in applicant portal: `https://portal.headlineagentur.com`
-- Public website front-end: `https://headlineagentur.com`
+- Magic Portal backend, admin, and logged-in applicant portal: `https://portal.headlinegp.com`
+- Public website front-end: `https://headlinegp.com`
 
 This project is **mirror-first** (not a redesign): it stores served HTML, JS/CSS bundles, fonts, and static assets so the app can be viewed with SPA route fallback.
 
@@ -134,9 +134,9 @@ Open: `http://localhost:4173`
 3. Set env vars:
    - `DATABASE_URL`
    - `PORT=4000` (or Railway default)
-   - `FRONTEND_ORIGIN=https://headlineagentur.com,https://portal.headlineagentur.com`
-   - `HEADLINE_PORTAL_BASE=https://portal.headlineagentur.com`
-   - `HEADLINE_WEBID_BASE=https://headlineagentur.com`
+   - `FRONTEND_ORIGIN=https://headlinegp.com,https://portal.headlinegp.com`
+   - `HEADLINE_PORTAL_BASE=https://portal.headlinegp.com`
+   - `HEADLINE_WEBID_BASE=https://headlinegp.com`
 4. Run migration command in Railway once:
    - `npm run prisma:deploy`
 5. Optionally seed once:
