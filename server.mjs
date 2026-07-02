@@ -33,7 +33,7 @@ const cspHeader = [
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "img-src 'self' data: https:",
   "font-src 'self' data: https://fonts.gstatic.com",
-  "connect-src 'self' https://portal.headlinegp.com https://*.supabase.co wss://*.supabase.co",
+  "connect-src 'self' https://portal.onvver.com https://*.supabase.co wss://*.supabase.co",
   "object-src 'none'",
   "base-uri 'self'",
   "frame-ancestors 'self'"

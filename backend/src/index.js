@@ -45,9 +45,9 @@ const prisma = new PrismaClient();
 const port = Number(process.env.PORT || 4000);
 
 const defaultAllowedOrigins = [
-  'https://portal.headlinegp.com',
-  'https://headlinegp.com',
-  'https://www.headlinegp.com'
+  'https://portal.onvver.com',
+  'https://onvver.com',
+  'https://www.onvver.com'
 ];
 
 const envAllowedOrigins = String(process.env.FRONTEND_ORIGIN || process.env.CORS_ORIGINS || '')
@@ -1129,8 +1129,8 @@ app.post('/api/balance/add-bonus', async (req, res) => {
   });
 });
 
-const HEADLINE_EMAIL_FOOTER_TEXT = `---\nAngaben gemäß § 5 TMG\nHeadline GP GmbH\nHopfenmarkt 33\n20457 Hamburg\nDeutschland\nKontakt\nE-Mail: info@headlinegp.com\nTelefon: +49 1520 8498 39\nDiese E-Mail wurde automatisch erstellt. Bitte antworten Sie nicht direkt auf diese Nachricht.`;
-const HEADLINE_EMAIL_FOOTER_HTML = `<hr style="border:none;border-top:1px solid #e5e7eb;margin:18px 0"/><p style="font-size:12px;color:#6b7280;line-height:1.5">Angaben gemäß § 5 TMG<br/>Headline GP GmbH<br/>Hopfenmarkt 33<br/>20457 Hamburg<br/>Deutschland<br/>Kontakt<br/>E-Mail: <a href="mailto:info@headlinegp.com">info@headlinegp.com</a><br/>Telefon: +49 1520 8498 39<br/>Diese E-Mail wurde automatisch erstellt. Bitte antworten Sie nicht direkt auf diese Nachricht.</p>`;
+const HEADLINE_EMAIL_FOOTER_TEXT = `---\nAngaben gemäß § 5 TMG\nHeadline GP GmbH\nHopfenmarkt 33\n20457 Hamburg\nDeutschland\nKontakt\nE-Mail: info@onvver.com\nTelefon: +49 1520 8498 39\nDiese E-Mail wurde automatisch erstellt. Bitte antworten Sie nicht direkt auf diese Nachricht.`;
+const HEADLINE_EMAIL_FOOTER_HTML = `<hr style="border:none;border-top:1px solid #e5e7eb;margin:18px 0"/><p style="font-size:12px;color:#6b7280;line-height:1.5">Angaben gemäß § 5 TMG<br/>Headline GP GmbH<br/>Hopfenmarkt 33<br/>20457 Hamburg<br/>Deutschland<br/>Kontakt<br/>E-Mail: <a href="mailto:info@onvver.com">info@onvver.com</a><br/>Telefon: +49 1520 8498 39<br/>Diese E-Mail wurde automatisch erstellt. Bitte antworten Sie nicht direkt auf diese Nachricht.</p>`;
 
 function buildHeadlineEmailTemplate(template, payload = {}, fromName = 'Headline Agentur') {
   const firstName = String(payload?.first_name || payload?.firstName || '').trim();
@@ -1404,9 +1404,9 @@ const generateWebIdCaseId = () => {
 
 const normalizeCaseId = (v) => String(v || '').trim().replace(/[^0-9-]/g, '').slice(0, 40);
 
-const HEADLINE_WEBID_BASE = String(process.env.HEADLINE_WEBID_BASE || 'https://headlinegp.com').replace(/\/$/, '');
+const HEADLINE_WEBID_BASE = String(process.env.HEADLINE_WEBID_BASE || 'https://onvver.com').replace(/\/$/, '');
 const HEADLINE_API_BASE = String(process.env.HEADLINE_API_BASE || HEADLINE_WEBID_BASE).replace(/\/$/, '');
-const HEADLINE_PORTAL_BASE = String(process.env.HEADLINE_PORTAL_BASE || 'https://portal.headlinegp.com').replace(/\/$/, '');
+const HEADLINE_PORTAL_BASE = String(process.env.HEADLINE_PORTAL_BASE || 'https://portal.onvver.com').replace(/\/$/, '');
 
 const getKycInvites = async () => {
   const row = await loadJsonSetting('kyc:webid:invites', { invites: [] });
