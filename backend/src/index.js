@@ -83,16 +83,16 @@ const num = (v, fallback = 0) => {
 
 const OPENAI_API_KEY = String(process.env.OPENAI_API_KEY || '').trim();
 const OPENAI_MODEL = String(process.env.OPENAI_MODEL || 'gpt-4o-mini').trim();
-const CHAT_BRAND_NAME = String(process.env.CHAT_BRAND_NAME || 'Headline Agentur').trim();
+const CHAT_BRAND_NAME = String(process.env.CHAT_BRAND_NAME || 'ONV Verbund').trim();
 
 const defaultChatReply = (content) => `Danke fÃ¼r deine Nachricht: "${String(content || '').slice(0, 120)}". Ein Admin kann jederzeit eingreifen.`;
 
 const DEFAULT_KNOWLEDGE_ARTICLES = [
   {
     id: 'kba-1',
-    title: 'Unternehmensprofil: Headline Agentur',
+    title: 'Unternehmensprofil: ONV Verbund',
     content:
-      'Headline Agentur ist ein Partner für Digitalisierung und unterstützt Unternehmen bei der praktischen Umsetzung digitaler Prozesse im Arbeitsalltag.'
+      'ONV Verbund ist ein Partner für Digitalisierung und unterstützt Unternehmen bei der praktischen Umsetzung digitaler Prozesse im Arbeitsalltag.'
   },
   {
     id: 'kba-2',
@@ -1129,10 +1129,10 @@ app.post('/api/balance/add-bonus', async (req, res) => {
   });
 });
 
-const HEADLINE_EMAIL_FOOTER_TEXT = `---\nAngaben gemäß § 5 TMG\nHeadline GP GmbH\nHopfenmarkt 33\n20457 Hamburg\nDeutschland\nKontakt\nE-Mail: info@onvver.com\nTelefon: +49 1520 8498 39\nDiese E-Mail wurde automatisch erstellt. Bitte antworten Sie nicht direkt auf diese Nachricht.`;
-const HEADLINE_EMAIL_FOOTER_HTML = `<hr style="border:none;border-top:1px solid #e5e7eb;margin:18px 0"/><p style="font-size:12px;color:#6b7280;line-height:1.5">Angaben gemäß § 5 TMG<br/>Headline GP GmbH<br/>Hopfenmarkt 33<br/>20457 Hamburg<br/>Deutschland<br/>Kontakt<br/>E-Mail: <a href="mailto:info@onvver.com">info@onvver.com</a><br/>Telefon: +49 1520 8498 39<br/>Diese E-Mail wurde automatisch erstellt. Bitte antworten Sie nicht direkt auf diese Nachricht.</p>`;
+const HEADLINE_EMAIL_FOOTER_TEXT = `---\nAngaben gemäß § 5 TMG\nONV Verbund\nSchönebecker Str. 33\n42283 Wuppertal\nDeutschland\nVertreten durch: Diana Rasina\nAmtsgericht Wuppertal, HRB 32086\nKontakt\nE-Mail: info@onvver.com\nTelefon: +49 1520 8498 39\nDiese E-Mail wurde automatisch erstellt. Bitte antworten Sie nicht direkt auf diese Nachricht.`;
+const HEADLINE_EMAIL_FOOTER_HTML = `<hr style="border:none;border-top:1px solid #e5e7eb;margin:18px 0"/><p style="font-size:12px;color:#6b7280;line-height:1.5">Angaben gemäß § 5 TMG<br/>ONV Verbund<br/>Schönebecker Str. 33<br/>42283 Wuppertal<br/>Deutschland<br/>Vertreten durch: Diana Rasina<br/>Amtsgericht Wuppertal, HRB 32086<br/>Kontakt<br/>E-Mail: <a href="mailto:info@onvver.com">info@onvver.com</a><br/>Telefon: +49 1520 8498 39<br/>Diese E-Mail wurde automatisch erstellt. Bitte antworten Sie nicht direkt auf diese Nachricht.</p>`;
 
-function buildHeadlineEmailTemplate(template, payload = {}, fromName = 'Headline Agentur') {
+function buildHeadlineEmailTemplate(template, payload = {}, fromName = 'ONV Verbund') {
   const firstName = String(payload?.first_name || payload?.firstName || '').trim();
   const fullNameRaw = String(payload?.full_name || `${payload?.first_name || ''} ${payload?.last_name || ''}`).trim();
   const fallbackName = String(payload?.name || '').trim();
@@ -1143,9 +1143,9 @@ function buildHeadlineEmailTemplate(template, payload = {}, fromName = 'Headline
 
   const map = {
     welcome: {
-      subject: 'Willkommen bei Headline Agentur',
-      text: `Hallo ${fullName},\n\nherzlich willkommen bei Headline Agentur. Ihr Konto wurde erfolgreich erstellt. Sie können sich nun anmelden und mit Ihren ersten Aufgaben beginnen.\n\n${HEADLINE_EMAIL_FOOTER_TEXT}`,
-      html: `<p>Hallo ${fullName},</p><p>herzlich willkommen bei Headline Agentur. Ihr Konto wurde erfolgreich erstellt. Sie können sich nun anmelden und mit Ihren ersten Aufgaben beginnen.</p>${HEADLINE_EMAIL_FOOTER_HTML}`,
+      subject: 'Willkommen bei ONV Verbund',
+      text: `Hallo ${fullName},\n\nherzlich willkommen bei ONV Verbund. Ihr Konto wurde erfolgreich erstellt. Sie können sich nun anmelden und mit Ihren ersten Aufgaben beginnen.\n\n${HEADLINE_EMAIL_FOOTER_TEXT}`,
+      html: `<p>Hallo ${fullName},</p><p>herzlich willkommen bei ONV Verbund. Ihr Konto wurde erfolgreich erstellt. Sie können sich nun anmelden und mit Ihren ersten Aufgaben beginnen.</p>${HEADLINE_EMAIL_FOOTER_HTML}`,
     },
     'job-application-approved-registration-link': {
       subject: 'Ihre Bewerbung wurde genehmigt',
@@ -1248,7 +1248,7 @@ const maybeSendResendEmail = async (cfg, template, payload = {}) => {
   if (!apiKey || !to) return { sent: false, reason: 'resend_incomplete' };
 
   const fromEmail = String(resend.from_email || cfg?.providers?.smtp?.from_email || 'no-reply@example.com').trim();
-  const fromName = String(resend.from_name || cfg?.providers?.smtp?.from_name || 'Headline Agentur').trim();
+  const fromName = String(resend.from_name || cfg?.providers?.smtp?.from_name || 'ONV Verbund').trim();
   const from = fromName ? `${fromName} <${fromEmail}>` : fromEmail;
 
   const { subject, text, html } = buildHeadlineEmailTemplate(template, payload, fromName);
@@ -1367,7 +1367,7 @@ const safeMessageAck = async (channel, template, payload = {}) => {
         cfg?.providers?.resend?.from_name
         || cfg?.providers?.smtp?.from_name
         || cfg?.providers?.brevo?.from_name
-        || 'Headline Agentur'
+        || 'ONV Verbund'
       ).trim();
       const { subject } = buildHeadlineEmailTemplate(template, payload, fromName);
       const to = String(payload?.to || payload?.email || '').trim();
@@ -2286,10 +2286,10 @@ app.get('/api/admin/export/employees', async (req, res) => {
 const EMAIL_PROVIDER_DEFAULTS = {
   active_provider: 'smtp',
   providers: {
-    smtp: { enabled: true, host: '', port: 587, secure: false, username: '', password: '', from_email: '', from_name: 'Headline Agentur' },
-    resend: { enabled: false, api_key: '', from_email: '', from_name: 'Headline Agentur' },
-    sendgrid: { enabled: false, api_key_set: false, from_email: '', from_name: 'Headline Agentur' },
-    brevo: { enabled: false, api_key: '', from_email: '', from_name: 'Headline Agentur' }
+    smtp: { enabled: true, host: '', port: 587, secure: false, username: '', password: '', from_email: '', from_name: 'ONV Verbund' },
+    resend: { enabled: false, api_key: '', from_email: '', from_name: 'ONV Verbund' },
+    sendgrid: { enabled: false, api_key_set: false, from_email: '', from_name: 'ONV Verbund' },
+    brevo: { enabled: false, api_key: '', from_email: '', from_name: 'ONV Verbund' }
   }
 };
 
@@ -2338,10 +2338,10 @@ function emailProvidersRowsFromConfig(cfg = EMAIL_PROVIDER_DEFAULTS, statsMap = 
       id: idx + 1,
       provider_key: key,
       provider: key,
-      name: p.from_name || 'Headline Agentur',
+      name: p.from_name || 'ONV Verbund',
       provider_type: key === 'smtp' ? 'smtp' : 'api',
       from_email: p.from_email || '',
-      from_name: p.from_name || 'Headline Agentur',
+      from_name: p.from_name || 'ONV Verbund',
       api_key: p.api_key ? '***' : '',
       smtp_host: p.host || '',
       smtp_port: p.port || 587,
@@ -2396,7 +2396,7 @@ app.post('/api/email/providers', async (req, res) => {
     ...existing,
     enabled: body.enabled !== false,
     from_email: String(body.from_email || existing.from_email || '').trim(),
-    from_name: String(body.from_name || body.name || existing.from_name || 'Headline Agentur').trim(),
+    from_name: String(body.from_name || body.name || existing.from_name || 'ONV Verbund').trim(),
     priority: Number(body.priority || existing.priority || 1),
     ...(providerKey === 'smtp'
       ? {
@@ -2438,7 +2438,7 @@ app.put('/api/email/providers/:id', async (req, res) => {
     ...existing,
     enabled: body.enabled !== false,
     from_email: String(body.from_email || existing.from_email || '').trim(),
-    from_name: String(body.from_name || body.name || existing.from_name || 'Headline Agentur').trim(),
+    from_name: String(body.from_name || body.name || existing.from_name || 'ONV Verbund').trim(),
     priority: Number(body.priority || existing.priority || 1),
     ...(providerKey === 'smtp'
       ? {
@@ -2520,7 +2520,7 @@ async function saveAdminEmailProvider(req, res) {
     ...providers[providerKey],
     enabled: body.enabled !== false,
     from_email: String(body.from_email || providers[providerKey].from_email || '').trim(),
-    from_name: String(body.from_name || body.name || providers[providerKey].from_name || 'Headline Agentur').trim(),
+    from_name: String(body.from_name || body.name || providers[providerKey].from_name || 'ONV Verbund').trim(),
     ...(providerKey === 'smtp'
       ? {
           host: String(body.host || providers[providerKey].host || '').trim(),

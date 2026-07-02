@@ -42,7 +42,7 @@ async function main() {
 
   await prisma.setting.createMany({
     data: [
-      { key: 'website_name', value: 'MagicVics 2' },
+      { key: 'website_name', value: 'ONV Verbund' },
       { key: 'payment_mode', value: 'vertragsbasis' },
       { key: 'kyc_required_for_tasks', value: false }
     ]

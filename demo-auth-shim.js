@@ -458,7 +458,7 @@
 
   // Login flow restored: no forced redirect to admin dashboard.
 
-  // Brand tweak requested by Jay: remove icon + rename to "MagicVics 2".
+  // Brand tweak requested by Jay: remove icon + rename to "ONV Verbund".
   function applyBrandPatch() {
     let patched = false;
 
@@ -466,8 +466,8 @@
     headings.forEach((heading) => {
       const txt = (heading.textContent || '').trim();
       if (/^magicvics(\s+demo)?$/i.test(txt) || /magicvics/i.test(txt)) {
-        if (heading.textContent !== 'MagicVics 2') {
-          heading.textContent = 'MagicVics 2';
+        if (heading.textContent !== 'ONV Verbund') {
+          heading.textContent = 'ONV Verbund';
         }
         patched = true;
       }
@@ -1034,7 +1034,7 @@
         deleted_at: null
       }
     ],
-    emails: [{ id: 'mail-1', subject: 'Willkommen bei MagicVics', status: 'sent', created_at: isoNow() }],
+    emails: [{ id: 'mail-1', subject: 'Willkommen bei ONV Verbund', status: 'sent', created_at: isoNow() }],
     email_history: [{ id: 'eh-1', subject: 'Demo History Entry', status: 'delivered', created_at: isoNow() }],
     email_providers: [{ id: 'ep-1', name: 'Demo SMTP', is_active: true, created_at: isoNow() }],
 
@@ -1134,7 +1134,7 @@
     ],
     settings: [{
       id: 'settings-1',
-      website_name: 'MagicVics 2',
+      website_name: 'ONV Verbund',
       kyc_required_for_tasks: false,
       // Match live dashboard layout: hide payment cards by using contract-based mode.
       payment_mode: 'vertragsbasis',
