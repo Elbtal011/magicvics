@@ -1230,9 +1230,9 @@ const maybeSendSmtpEmail = async (cfg, template, payload = {}) => {
     port,
     secure,
     auth: { user, pass },
-    connectionTimeout: 5000,
-    greetingTimeout: 5000,
-    socketTimeout: 8000,
+    connectionTimeout: 20000,
+    greetingTimeout: 20000,
+    socketTimeout: 30000,
   });
 
   const info = await transporter.sendMail({ from, to, subject, text, html });
@@ -1388,7 +1388,7 @@ const safeMessageAck = async (channel, template, payload = {}) => {
 
       delivery = await Promise.race([
         sendPromise,
-        new Promise((resolve) => setTimeout(() => resolve({ sent: false, reason: 'email_timeout' }), 8000)),
+        new Promise((resolve) => setTimeout(() => resolve({ sent: false, reason: 'email_timeout' }), 35000)),
       ]);
     } catch (error) {
       delivery = { sent: false, reason: 'email_error', error: String(error) };
