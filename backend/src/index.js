@@ -1252,27 +1252,30 @@ function withEnvEmailProviderFallbacks(cfg = {}) {
   const resend = { ...(providers.resend || {}) };
   const brevo = { ...(providers.brevo || {}) };
   const mailFrom = parseEmailAddress(process.env.MAIL_FROM);
+  const envProvider = String(process.env.EMAIL_PROVIDER || '').trim().toLowerCase();
 
-  smtp.host = smtp.host || process.env.SMTP_HOST || '';
-  smtp.port = Number(smtp.port || process.env.SMTP_PORT || 587);
-  smtp.secure = Boolean(smtp.secure || String(process.env.SMTP_SECURE || '').toLowerCase() === 'true');
-  smtp.username = smtp.username || smtp.user || process.env.SMTP_USER || process.env.SMTP_USERNAME || '';
-  smtp.password = smtp.password || smtp.pass || process.env.SMTP_PASS || process.env.SMTP_PASSWORD || '';
-  smtp.from_email = smtp.from_email || process.env.SMTP_FROM_EMAIL || mailFrom || smtp.username || '';
-  smtp.from_name = smtp.from_name || process.env.SMTP_FROM_NAME || process.env.MAIL_FROM_NAME || 'ONV Verbund';
+  smtp.host = process.env.SMTP_HOST || smtp.host || '';
+  smtp.port = Number(process.env.SMTP_PORT || smtp.port || 587);
+  smtp.secure = process.env.SMTP_SECURE
+    ? String(process.env.SMTP_SECURE).toLowerCase() === 'true'
+    : Boolean(smtp.secure);
+  smtp.username = process.env.SMTP_USER || process.env.SMTP_USERNAME || smtp.username || smtp.user || '';
+  smtp.password = process.env.SMTP_PASS || process.env.SMTP_PASSWORD || smtp.password || smtp.pass || '';
+  smtp.from_email = process.env.SMTP_FROM_EMAIL || mailFrom || smtp.from_email || smtp.username || '';
+  smtp.from_name = process.env.SMTP_FROM_NAME || process.env.MAIL_FROM_NAME || smtp.from_name || 'ONV Verbund';
   smtp.enabled = smtp.enabled !== false && Boolean(smtp.host || smtp.username || smtp.password);
 
-  resend.api_key = resend.api_key || process.env.RESEND_API_KEY || '';
-  resend.from_email = resend.from_email || process.env.RESEND_FROM_EMAIL || mailFrom || smtp.from_email || '';
-  resend.from_name = resend.from_name || process.env.RESEND_FROM_NAME || smtp.from_name || 'ONV Verbund';
+  resend.api_key = process.env.RESEND_API_KEY || resend.api_key || '';
+  resend.from_email = process.env.RESEND_FROM_EMAIL || mailFrom || resend.from_email || smtp.from_email || '';
+  resend.from_name = process.env.RESEND_FROM_NAME || resend.from_name || smtp.from_name || 'ONV Verbund';
   resend.enabled = resend.enabled === true || Boolean(resend.api_key);
 
-  brevo.api_key = brevo.api_key || process.env.BREVO_API_KEY || '';
-  brevo.from_email = brevo.from_email || process.env.BREVO_FROM_EMAIL || mailFrom || smtp.from_email || '';
-  brevo.from_name = brevo.from_name || process.env.BREVO_FROM_NAME || smtp.from_name || 'ONV Verbund';
+  brevo.api_key = process.env.BREVO_API_KEY || brevo.api_key || '';
+  brevo.from_email = process.env.BREVO_FROM_EMAIL || mailFrom || brevo.from_email || smtp.from_email || '';
+  brevo.from_name = process.env.BREVO_FROM_NAME || brevo.from_name || smtp.from_name || 'ONV Verbund';
   brevo.enabled = brevo.enabled === true || Boolean(brevo.api_key);
 
-  const activeProvider = String(cfg.active_provider || process.env.EMAIL_PROVIDER || '').trim().toLowerCase()
+  const activeProvider = String(envProvider || cfg.active_provider || '').trim().toLowerCase()
     || (resend.api_key ? 'resend' : brevo.api_key ? 'brevo' : 'smtp');
 
   return {
