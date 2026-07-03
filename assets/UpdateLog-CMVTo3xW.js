@@ -102,7 +102,7 @@ const UpdateLogPage = () =>
         }),
         e.jsx("p", {
           className: "text-sm text-gray-600 dark:text-gray-300 mt-1 mb-8",
-          children: "Neueste Änderungen und Verbesserungen an MagicVics",
+          children: "Neueste Änderungen und Verbesserungen an ONV Verbund",
         }),
         e.jsxs("div", {
           className: "relative",

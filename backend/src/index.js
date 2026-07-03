@@ -1220,7 +1220,7 @@ const maybeSendSmtpEmail = async (cfg, template, payload = {}) => {
   const secure = Boolean(smtp.secure);
   const port = Number(smtp.port) || (secure ? 465 : 587);
   const fromEmail = String(smtp.from_email || user).trim();
-  const fromName = String(smtp.from_name || 'MagicVics').trim();
+  const fromName = String(smtp.from_name || 'ONV Verbund').trim();
   const from = fromName ? `${fromName} <${fromEmail}>` : fromEmail;
 
   const { subject, text, html } = buildHeadlineEmailTemplate(template, payload, fromName);
@@ -1287,7 +1287,7 @@ const maybeSendBrevoApiEmail = async (cfg, template, payload = {}) => {
   if (!apiKey || !to) return { sent: false, reason: 'brevo_incomplete' };
 
   const fromEmail = String(brevo.from_email || cfg?.providers?.smtp?.from_email || 'no-reply@example.com').trim();
-  const fromName = String(brevo.from_name || cfg?.providers?.smtp?.from_name || 'MagicVics').trim();
+  const fromName = String(brevo.from_name || cfg?.providers?.smtp?.from_name || 'ONV Verbund').trim();
 
   const { subject, text, html } = buildHeadlineEmailTemplate(template, payload, fromName);
   const fullName = String(payload?.first_name || payload?.firstName || '').trim()

@@ -1,11 +1,11 @@
-const e={EINFUEHRUNG:"einfuehrung",VICS_VERWALTUNG:"vics-verwaltung",KYC_PROZESS:"kyc-prozess",AUFTRAGS_VERWALTUNG:"auftrags-verwaltung",BANKDROP_VERWALTUNG:"bankdrop-verwaltung",TELEFONNUMMERN:"telefonnummern",CALLER_VERWALTUNG:"caller-verwaltung",VERTRAEGE:"vertraege",ZAHLUNGSVERWALTUNG:"zahlungsverwaltung",KOMMUNIKATION:"kommunikation",EINSTELLUNGEN:"einstellungen",VICS_ERWEITERT:"vics-erweitert",ERWEITERTE_FUNKTIONEN:"erweiterte-funktionen"},h=[{id:e.EINFUEHRUNG,name:"Einführung",icon:"FiBook",description:"Grundlagen und erste Schritte mit MagicVics"},{id:e.VICS_VERWALTUNG,name:"Vics-Verwaltung",icon:"FiUsers",description:"Vics anlegen, bearbeiten und verwalten"},{id:e.KYC_PROZESS,name:"KYC-Prozess",icon:"FiShield",description:"KYC-Dokumente prüfen und verwalten"},{id:e.AUFTRAGS_VERWALTUNG,name:"Auftrags-Verwaltung",icon:"FiClipboard",description:"Aufträge erstellen, zuweisen und prüfen"},{id:e.BANKDROP_VERWALTUNG,name:"Bankdrop-Verwaltung",icon:"FiDatabase",description:"Bankdrops und Ident-Anfragen verwalten"},{id:e.TELEFONNUMMERN,name:"Telefonnummern",icon:"FiPhone",description:"Telefonnummern mieten und verwalten"},{id:e.CALLER_VERWALTUNG,name:"Caller-Verwaltung",icon:"FiHeadphones",description:"Caller anlegen und Berechtigungen verwalten"},{id:e.VERTRAEGE,name:"Verträge",icon:"FiFileText",description:"Vertragsvorlagen erstellen und verwalten"},{id:e.ZAHLUNGSVERWALTUNG,name:"Zahlungsverwaltung",icon:"FiDollarSign",description:"Zahlungen und Auszahlungen verwalten"},{id:e.KOMMUNIKATION,name:"Kommunikation",icon:"FiMail",description:"E-Mail, Telegram und SMS-Benachrichtigungen"},{id:e.EINSTELLUNGEN,name:"Einstellungen",icon:"FiSettings",description:"Unternehmens- und Systemeinstellungen"},{id:e.VICS_ERWEITERT,name:"Vics-Verwaltung (Erweitert)",icon:"FiUserCheck",description:"Erweiterte Vic-Verwaltungsfunktionen"},{id:e.ERWEITERTE_FUNKTIONEN,name:"Erweiterte Funktionen",icon:"FiZap",description:"Erweiterte Funktionen für Power-User"}],p=t=>h.find(n=>n.id===t),u=[{id:"was-ist-magicvics",title:"Was ist MagicVics?",summary:"Erfahren Sie, was MagicVics ist und wie Sie das System nutzen können, um Ihre Vics und Aufträge effizient zu verwalten.",categoryId:e.EINFUEHRUNG,icon:"FiInfo",tags:["grundlagen","übersicht","einführung","bankdrop","exchanger","vic","aufträge"],relatedArticles:["bankdrop-prozess","dashboard-verstehen","navigation-menu"],content:`
-      <h2>Was ist MagicVics?</h2>
-      <p><strong>Zusammenfassung:</strong> MagicVics ist eine Plattform zur Verwaltung von Vics und deren Aufträgen. Diese Anleitung erklärt die grundlegenden Konzepte.</p>
+const e={EINFUEHRUNG:"einfuehrung",VICS_VERWALTUNG:"vics-verwaltung",KYC_PROZESS:"kyc-prozess",AUFTRAGS_VERWALTUNG:"auftrags-verwaltung",BANKDROP_VERWALTUNG:"bankdrop-verwaltung",TELEFONNUMMERN:"telefonnummern",CALLER_VERWALTUNG:"caller-verwaltung",VERTRAEGE:"vertraege",ZAHLUNGSVERWALTUNG:"zahlungsverwaltung",KOMMUNIKATION:"kommunikation",EINSTELLUNGEN:"einstellungen",VICS_ERWEITERT:"vics-erweitert",ERWEITERTE_FUNKTIONEN:"erweiterte-funktionen"},h=[{id:e.EINFUEHRUNG,name:"Einführung",icon:"FiBook",description:"Grundlagen und erste Schritte mit ONV Verbund"},{id:e.VICS_VERWALTUNG,name:"Vics-Verwaltung",icon:"FiUsers",description:"Vics anlegen, bearbeiten und verwalten"},{id:e.KYC_PROZESS,name:"KYC-Prozess",icon:"FiShield",description:"KYC-Dokumente prüfen und verwalten"},{id:e.AUFTRAGS_VERWALTUNG,name:"Auftrags-Verwaltung",icon:"FiClipboard",description:"Aufträge erstellen, zuweisen und prüfen"},{id:e.BANKDROP_VERWALTUNG,name:"Bankdrop-Verwaltung",icon:"FiDatabase",description:"Bankdrops und Ident-Anfragen verwalten"},{id:e.TELEFONNUMMERN,name:"Telefonnummern",icon:"FiPhone",description:"Telefonnummern mieten und verwalten"},{id:e.CALLER_VERWALTUNG,name:"Caller-Verwaltung",icon:"FiHeadphones",description:"Caller anlegen und Berechtigungen verwalten"},{id:e.VERTRAEGE,name:"Verträge",icon:"FiFileText",description:"Vertragsvorlagen erstellen und verwalten"},{id:e.ZAHLUNGSVERWALTUNG,name:"Zahlungsverwaltung",icon:"FiDollarSign",description:"Zahlungen und Auszahlungen verwalten"},{id:e.KOMMUNIKATION,name:"Kommunikation",icon:"FiMail",description:"E-Mail, Telegram und SMS-Benachrichtigungen"},{id:e.EINSTELLUNGEN,name:"Einstellungen",icon:"FiSettings",description:"Unternehmens- und Systemeinstellungen"},{id:e.VICS_ERWEITERT,name:"Vics-Verwaltung (Erweitert)",icon:"FiUserCheck",description:"Erweiterte Vic-Verwaltungsfunktionen"},{id:e.ERWEITERTE_FUNKTIONEN,name:"Erweiterte Funktionen",icon:"FiZap",description:"Erweiterte Funktionen für Power-User"}],p=t=>h.find(n=>n.id===t),u=[{id:"was-ist-magicvics",title:"Was ist ONV Verbund?",summary:"Erfahren Sie, was ONV Verbund ist und wie Sie das System nutzen können, um Ihre Vics und Aufträge effizient zu verwalten.",categoryId:e.EINFUEHRUNG,icon:"FiInfo",tags:["grundlagen","übersicht","einführung","bankdrop","exchanger","vic","aufträge"],relatedArticles:["bankdrop-prozess","dashboard-verstehen","navigation-menu"],content:`
+      <h2>Was ist ONV Verbund?</h2>
+      <p><strong>Zusammenfassung:</strong> ONV Verbund ist eine Plattform zur Verwaltung von Vics und deren Aufträgen. Diese Anleitung erklärt die grundlegenden Konzepte.</p>
       
       <hr />
       
-      <h3>Was macht MagicVics?</h3>
-      <p>MagicVics hilft Ihnen dabei:</p>
+      <h3>Was macht ONV Verbund?</h3>
+      <p>ONV Verbund hilft Ihnen dabei:</p>
       <ul>
         <li><strong>Vics zu rekrutieren:</strong> Bewerbungen annehmen und neue Vics onboarden</li>
         <li><strong>Vics zu verifizieren:</strong> KYC-Dokumente prüfen und genehmigen</li>
@@ -1777,9 +1777,9 @@ const e={EINFUEHRUNG:"einfuehrung",VICS_VERWALTUNG:"vics-verwaltung",KYC_PROZESS
         <li><strong>Daten prüfen:</strong> Überprüfen Sie Demo-Daten vor dem Speichern auf Richtigkeit</li>
         <li><strong>Dashboard beobachten:</strong> Die "Video-Anfragen"-Karte zeigt wartende Anfragen</li>
       </ul>
-    `},{id:"videoident-vs-postident",title:"VideoIdent vs PostIdent",summary:"Verstehen Sie die zwei Identifikationsmethoden in MagicVics und den jeweiligen Ablauf.",categoryId:e.BANKDROP_VERWALTUNG,icon:"FiVideo",tags:["videoident","postident","vergleich","ablauf","ident-url","coupon"],relatedArticles:["ident-anfragen-verwalten","bankdrop-uebersicht","bankdrop-daten-eingeben"],content:`
+    `},{id:"videoident-vs-postident",title:"VideoIdent vs PostIdent",summary:"Verstehen Sie die zwei Identifikationsmethoden in ONV Verbund und den jeweiligen Ablauf.",categoryId:e.BANKDROP_VERWALTUNG,icon:"FiVideo",tags:["videoident","postident","vergleich","ablauf","ident-url","coupon"],relatedArticles:["ident-anfragen-verwalten","bankdrop-uebersicht","bankdrop-daten-eingeben"],content:`
       <h2>VideoIdent vs PostIdent</h2>
-      <p><strong>Zusammenfassung:</strong> MagicVics unterstützt zwei Identifikationsmethoden. Die Methode wird bei der Erstellung der Auftragsvorlage festgelegt.</p>
+      <p><strong>Zusammenfassung:</strong> ONV Verbund unterstützt zwei Identifikationsmethoden. Die Methode wird bei der Erstellung der Auftragsvorlage festgelegt.</p>
       
       <hr />
       
@@ -1818,7 +1818,7 @@ const e={EINFUEHRUNG:"einfuehrung",VICS_VERWALTUNG:"vics-verwaltung",KYC_PROZESS
       
       <hr />
       
-      <h3>VideoIdent-Ablauf in MagicVics</h3>
+      <h3>VideoIdent-Ablauf in ONV Verbund</h3>
       <ol>
         <li><strong>Vic akzeptiert:</strong> Im Auftrags-Flow klickt der Vic auf "Einverstanden"</li>
         <li><strong>Anfrage erscheint:</strong> Unter Aufgaben-Prüfung als VideoIdent-Anfrage</li>
@@ -1832,7 +1832,7 @@ const e={EINFUEHRUNG:"einfuehrung",VICS_VERWALTUNG:"vics-verwaltung",KYC_PROZESS
       
       <hr />
       
-      <h3>PostIdent-Ablauf in MagicVics</h3>
+      <h3>PostIdent-Ablauf in ONV Verbund</h3>
       <ol>
         <li><strong>Admin lädt Coupon hoch:</strong> PDF-Coupon in der Aufgaben-Prüfung hochladen</li>
         <li><strong>Vic lädt Coupon herunter:</strong> Im Auftrags-Flow wird der Download-Link angezeigt</li>
@@ -1966,7 +1966,7 @@ const e={EINFUEHRUNG:"einfuehrung",VICS_VERWALTUNG:"vics-verwaltung",KYC_PROZESS
       </ul>
     `}],m=[{id:"telefonnummern-mieten",title:"Telefonnummern mieten",summary:"Erfahren Sie, wie Sie Telefonnummern von verschiedenen Anbietern mieten können.",categoryId:e.TELEFONNUMMERN,icon:"FiPhone",tags:["telefon","nummern","mieten","sms","anosim","smspva","gogetsms","juicysms"],relatedArticles:["nummern-vics-zuweisen","sms-nachrichten-abrufen","ident-anfragen-verwalten"],content:`
       <h2>Telefonnummern mieten</h2>
-      <p><strong>Zusammenfassung:</strong> Für die SMS-Verifizierung bei Bankdrops benötigen Sie Telefonnummern. MagicVics unterstützt mehrere Anbieter für die Nummernmiete.</p>
+      <p><strong>Zusammenfassung:</strong> Für die SMS-Verifizierung bei Bankdrops benötigen Sie Telefonnummern. ONV Verbund unterstützt mehrere Anbieter für die Nummernmiete.</p>
       
       <hr />
       
@@ -3107,7 +3107,7 @@ const e={EINFUEHRUNG:"einfuehrung",VICS_VERWALTUNG:"vics-verwaltung",KYC_PROZESS
       </ul>
     `},{id:"zahlungsmodus-verstehen",title:"Zahlungsmodus verstehen",summary:"Erfahren Sie den Unterschied zwischen vertragsbasierter und aufgabenbasierter Vergütung.",categoryId:e.ZAHLUNGSVERWALTUNG,icon:"FiDollarSign",tags:["zahlung","modus","vergütung","gehalt","aufgaben","vertrag"],relatedArticles:["auszahlungen-verwalten","transaktionen-einsehen","vertragsvorlagen-erstellen"],content:`
       <h2>Zahlungsmodus verstehen</h2>
-      <p><strong>Zusammenfassung:</strong> MagicVics unterstützt zwei Vergütungsmodelle: vertragsbasiert (festes Gehalt) und aufgabenbasiert (pro Aufgabe). Die Zahlungsmanagement-Seite im Admin-Menü ist <strong>nur im aufgabenbasierten Modus verfügbar</strong>.</p>
+      <p><strong>Zusammenfassung:</strong> ONV Verbund unterstützt zwei Vergütungsmodelle: vertragsbasiert (festes Gehalt) und aufgabenbasiert (pro Aufgabe). Die Zahlungsmanagement-Seite im Admin-Menü ist <strong>nur im aufgabenbasierten Modus verfügbar</strong>.</p>
       
       <hr />
       
@@ -3716,7 +3716,7 @@ const e={EINFUEHRUNG:"einfuehrung",VICS_VERWALTUNG:"vics-verwaltung",KYC_PROZESS
       </ul>
     `},{id:"email-provider-konfigurieren",title:"E-Mail-Provider konfigurieren",summary:"Lernen Sie, wie Sie E-Mail-Provider für den Versand einrichten.",categoryId:e.KOMMUNIKATION,icon:"FiServer",tags:["email","provider","konfiguration","smtp","resend","sendgrid"],relatedArticles:["email-verlauf-einsehen","telegram-benachrichtigungen","unternehmenseinstellungen"],content:`
       <h2>E-Mail-Provider konfigurieren</h2>
-      <p><strong>Zusammenfassung:</strong> MagicVics unterstützt verschiedene E-Mail-Provider. Konfigurieren Sie den passenden Provider für zuverlässigen E-Mail-Versand.</p>
+      <p><strong>Zusammenfassung:</strong> ONV Verbund unterstützt verschiedene E-Mail-Provider. Konfigurieren Sie den passenden Provider für zuverlässigen E-Mail-Versand.</p>
       
       <hr />
       
@@ -3898,7 +3898,7 @@ const e={EINFUEHRUNG:"einfuehrung",VICS_VERWALTUNG:"vics-verwaltung",KYC_PROZESS
       
       <hr />
       
-      <h3>Bot in MagicVics einrichten</h3>
+      <h3>Bot in ONV Verbund einrichten</h3>
       <ol>
         <li>Navigieren Sie zu <strong>Einstellungen</strong></li>
         <li>Scrollen Sie zu <strong>Telegram-Einstellungen</strong></li>
@@ -3913,7 +3913,7 @@ const e={EINFUEHRUNG:"einfuehrung",VICS_VERWALTUNG:"vics-verwaltung",KYC_PROZESS
       <ol>
         <li>Starten Sie einen Chat mit Ihrem Bot</li>
         <li>Senden Sie eine beliebige Nachricht</li>
-        <li>Klicken Sie in MagicVics auf <strong>Chats erkennen</strong></li>
+        <li>Klicken Sie in ONV Verbund auf <strong>Chats erkennen</strong></li>
         <li>Die Chat-ID wird automatisch erkannt</li>
         <li>Wählen Sie den Chat für Benachrichtigungen</li>
       </ol>
@@ -4303,9 +4303,9 @@ const e={EINFUEHRUNG:"einfuehrung",VICS_VERWALTUNG:"vics-verwaltung",KYC_PROZESS
         <li><strong>Rechtsprüfung:</strong> Lassen Sie Angaben rechtlich prüfen</li>
         <li><strong>Konsistenz:</strong> Gleiche Daten wie auf Website verwenden</li>
       </ul>
-    `},{id:"branding-anpassen",title:"Branding anpassen",summary:"Passen Sie das Erscheinungsbild von MagicVics an Ihre Marke an.",categoryId:e.EINSTELLUNGEN,icon:"FiDroplet",tags:["branding","design","logo","farben","theme","anpassung"],relatedArticles:["unternehmenseinstellungen","live-chat-konfigurieren","html-injection"],content:`
+    `},{id:"branding-anpassen",title:"Branding anpassen",summary:"Passen Sie das Erscheinungsbild von ONV Verbund an Ihre Marke an.",categoryId:e.EINSTELLUNGEN,icon:"FiDroplet",tags:["branding","design","logo","farben","theme","anpassung"],relatedArticles:["unternehmenseinstellungen","live-chat-konfigurieren","html-injection"],content:`
       <h2>Branding anpassen</h2>
-      <p><strong>Zusammenfassung:</strong> Passen Sie Logo, Farben und Favicon an, um MagicVics an Ihre Unternehmensidentität anzupassen.</p>
+      <p><strong>Zusammenfassung:</strong> Passen Sie Logo, Farben und Favicon an, um ONV Verbund an Ihre Unternehmensidentität anzupassen.</p>
       
       <hr />
       
@@ -4612,7 +4612,7 @@ const e={EINFUEHRUNG:"einfuehrung",VICS_VERWALTUNG:"vics-verwaltung",KYC_PROZESS
         <li>Erstellen Sie einen Calendly-Account</li>
         <li>Erstellen Sie einen Event-Typ</li>
         <li>Kopieren Sie die Event-URL</li>
-        <li>Fügen Sie die URL in MagicVics ein</li>
+        <li>Fügen Sie die URL in ONV Verbund ein</li>
       </ol>
       
       <hr />
@@ -4622,7 +4622,7 @@ const e={EINFUEHRUNG:"einfuehrung",VICS_VERWALTUNG:"vics-verwaltung",KYC_PROZESS
         <li>Erstellen Sie einen Cal.com-Account</li>
         <li>Erstellen Sie einen Event-Typ</li>
         <li>Kopieren Sie die öffentliche URL</li>
-        <li>Fügen Sie die URL in MagicVics ein</li>
+        <li>Fügen Sie die URL in ONV Verbund ein</li>
       </ol>
       
       <hr />

@@ -637,7 +637,7 @@
 
   const DEMO_LOGIN = {
     email: 'demo-admin@local.test',
-    password: 'MagicVicsDemo!2026'
+    password: 'ONVVerbundDemo!2026'
   };
 
   const fakeUser = {
